@@ -228,19 +228,29 @@ class PassgenInputMethodService : InputMethodService() {
 
 /**
  * OnTouchListener that drops touches when the window is obscured (fully or
- * partially). Mirrors the Compose SecureButton's approach: re-checks on every
- * DOWN and MOVE event — overlays that flicker between DOWN and UP would slip
- * through a DOWN-only filter. Returns true to consume → click suppressed.
+ * partially). Mirrors the Compose SecureButton's logic: blocked is decided at
+ * DOWN (obscured or focus lost) and can only be raised by an obscured MOVE —
+ * it then latches for the rest of the gesture. Consuming only the individual
+ * obscured event is not enough: an overlay that flickers on during a MOVE and
+ * off again before UP would still let the click land. While blocked, every
+ * event is consumed, so the view never sees the UP that performs the click.
  */
 private class ObscuredTouchGate : View.OnTouchListener {
+    private var blocked = false
+
     override fun onTouch(v: View, ev: MotionEvent): Boolean {
         when (ev.actionMasked) {
-            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
-                val mask = MotionEvent.FLAG_WINDOW_IS_OBSCURED or
-                    MotionEvent.FLAG_WINDOW_IS_PARTIALLY_OBSCURED
-                if ((ev.flags and mask) != 0) return true
-            }
+            MotionEvent.ACTION_DOWN ->
+                blocked = isObscured(ev) || !v.hasWindowFocus()
+            MotionEvent.ACTION_MOVE ->
+                if (isObscured(ev)) blocked = true
         }
-        return false
+        return blocked
+    }
+
+    private fun isObscured(ev: MotionEvent): Boolean {
+        val mask = MotionEvent.FLAG_WINDOW_IS_OBSCURED or
+            MotionEvent.FLAG_WINDOW_IS_PARTIALLY_OBSCURED
+        return (ev.flags and mask) != 0
     }
 }

@@ -9,6 +9,7 @@ import com.understory.security.DiagnosticsScreen
 import com.understory.security.KeepAliveBackHandler
 import com.understory.security.SecureButton
 import com.understory.security.SecureOutlinedButton
+import com.understory.security.SuitePins
 import com.understory.security.Tamper
 import com.understory.security.TestingMode
 
@@ -253,7 +254,7 @@ class MainActivity : ComponentActivity() {
                         Text("Cert digest (this install):", color = Color(0xFF9E9E9E), fontSize = 11.sp)
                         Text(sigDigest, color = Color(0xFFE0E0E0), fontSize = 10.sp)
                         Text("Cert digest (expected):", color = Color(0xFF9E9E9E), fontSize = 11.sp)
-                        Text("aba68a81a0d63b5549794e586875a4f04e6dba3a6fe25d363e04eb75f46df69e", color = Color(0xFFE0E0E0), fontSize = 10.sp)
+                        Text(SuitePins.EXPECTED_CERT_SHA256, color = Color(0xFFE0E0E0), fontSize = 10.sp)
                         if (stack != null) {
                             Spacer(Modifier.height(8.dp))
                             Text("Stack trace:", color = Color(0xFF9E9E9E), fontSize = 11.sp)

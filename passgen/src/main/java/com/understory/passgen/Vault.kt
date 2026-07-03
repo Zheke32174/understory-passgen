@@ -115,9 +115,10 @@ object Vault {
      * Atomic file-replace. On Android filesystems (ext4 / f2fs) the
      * NIO Files.move with ATOMIC_MOVE is genuinely atomic; the previous
      * delete-then-rename sequence had a process-death window where the
-     * vault file would be lost.
+     * vault file would be lost. Sole replace path for the vault — both
+     * [writeFileV2] and [UnlockedVault.save] must go through here.
      */
-    private fun atomicReplace(src: java.io.File, dst: java.io.File) {
+    internal fun atomicReplace(src: java.io.File, dst: java.io.File) {
         try {
             java.nio.file.Files.move(
                 src.toPath(),
@@ -405,19 +406,7 @@ class UnlockedVault internal constructor(
             out.write(ct)
         }
         val target = java.io.File(ctx.filesDir, "vault.bin")
-        try {
-            java.nio.file.Files.move(
-                tmp.toPath(),
-                target.toPath(),
-                java.nio.file.StandardCopyOption.REPLACE_EXISTING,
-                java.nio.file.StandardCopyOption.ATOMIC_MOVE,
-            )
-        } catch (_: Throwable) {
-            if (!tmp.renameTo(target)) {
-                target.delete()
-                check(tmp.renameTo(target)) { "vault save failed" }
-            }
-        }
+        Vault.atomicReplace(tmp, target)
     }
 
     fun lock() {

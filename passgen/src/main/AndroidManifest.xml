@@ -3,22 +3,19 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <!--
-      Suite capability registry permissions. Each suite app defines its
-      OWN signature-protected READ_CAPS permission for its own
-      SuiteCapsProvider, and declares uses-permission for every peer's
-      permission so PackageManager.checkPermission grants the read at
-      query time. signature protection level means only same-cert callers
-      (i.e. other suite apps) can read.
+      Suite capability registry permission. ONE shared signature-level
+      name declared identically in every suite app (first-installed
+      definition wins by Android semantics; identical same-cert
+      declarations keep that safe). CAPS_WRITE is defined but requested
+      by no app — a permanently locked write gate for the provider.
     -->
     <permission
-        android:name="com.understory.passgen.permission.READ_CAPS"
+        android:name="com.understory.suite.CAPS"
         android:protectionLevel="signature" />
-    <uses-permission android:name="com.understory.aegis.permission.READ_CAPS" />
-    <uses-permission android:name="com.understory.firewall.permission.READ_CAPS" />
-    <uses-permission android:name="com.understory.backups.permission.READ_CAPS" />
-    <uses-permission android:name="com.understory.browser.permission.READ_CAPS" />
-    <uses-permission android:name="com.understory.antivirus.permission.READ_CAPS" />
-    <uses-permission android:name="com.understory.vaultfolder.permission.READ_CAPS" />
+    <permission
+        android:name="com.understory.suite.CAPS_WRITE"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="com.understory.suite.CAPS" />
 
     <!--
       Defense in depth: passgen has no business touching any communication
@@ -168,26 +165,20 @@
         android:supportsRtl="true">
 
         <!--
-          excludeFromRecents="true" was previously set on these activities
-          so the suite wouldn't appear in the system app switcher (a side-
-          channel that lets another user of the device see what's running).
-          Removed for the testing phase so the user can switch between
-          passgen and a chat app to paste diagnostic dumps without the
-          launcher-icon round-trip and the cold start that goes with it.
-          RELEASE-BLOCKER: re-add android:excludeFromRecents="true" before
-          publication. Tracked in RELEASE_BLOCKERS.md.
+          excludeFromRecents="true" keeps the vault-bearing activities out
+          of the system app switcher (a side-channel that lets another
+          user of the device see what's running). It was lifted for the
+          testing phase and is now re-added per RELEASE_BLOCKERS.md.
 
-          launchMode="singleTask" so that returning to passgen from recents
-          resumes the existing instance with state intact, instead of
-          creating a fresh activity each time. This is what users expect
-          from "leave and come back" navigation. Combined with
-          excludeFromRecents being lifted, the apps now behave like normal
-          Android apps for the testing phase.
+          launchMode="singleTask" (kept as-is) so that returning to
+          passgen resumes the existing instance with state intact,
+          instead of creating a fresh activity each time.
         -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
+            android:excludeFromRecents="true"
             android:resizeableActivity="false"
             android:screenOrientation="portrait"
             android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
@@ -221,6 +212,7 @@
         <activity
             android:name=".VaultActivity"
             android:exported="false"
+            android:excludeFromRecents="true"
             android:resizeableActivity="false"
             android:screenOrientation="portrait"
             android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
@@ -294,7 +286,8 @@
             android:name=".SuiteCapsProvider"
             android:authorities="com.understory.passgen.suitecaps"
             android:exported="true"
-            android:permission="com.understory.passgen.permission.READ_CAPS"
+            android:readPermission="com.understory.suite.CAPS"
+            android:writePermission="com.understory.suite.CAPS_WRITE"
             android:grantUriPermissions="false" />
 
     </application>
