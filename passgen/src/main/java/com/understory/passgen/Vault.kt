@@ -230,6 +230,22 @@ object Vault {
 
             writeFileV2(ctx, wrappedKekIv, wrappedKekCt, contentCt)
 
+            // SELF-SEAL (operator directive 2026-07-03, "the screen is the
+            // enemy"): mint a random recovery key and write an at-rest,
+            // wrap-key-encrypted recovery kit for the vault's KEK material. No
+            // prompt, nothing shown, nothing typed. The wrap key survives
+            // biometric re-enrollment, so a re-enrollment-bricked vault can be
+            // silently re-bound from this kit with zero user action. Best-effort:
+            // a sealing failure must not abort vault creation (the encrypted
+            // Export file remains the disaster-recovery path).
+            runCatching {
+                com.understory.backup.RecoveryFile.seal(ctx, ctx.packageName, masterKek)
+            }.onFailure {
+                com.understory.security.Diagnostics.error(
+                    "passgen.Vault", "recovery-kit seal failed: ${it.message}",
+                )
+            }
+
             // Build the in-memory unlocked vault directly so the user lands
             // in the vault list without re-authenticating.
             return UnlockedVault(ctx, headerV2 = HeaderV2(wrappedKekIv, wrappedKekCt), kek = masterKek.copyOf(), contents = contents)
@@ -261,6 +277,59 @@ object Vault {
     }
 
     fun ivForUnlock(ctx: Context): ByteArray = readFileV2(ctx).first.wrappedKekIv
+
+    /**
+     * Re-bind an existing vault to a fresh device-auth key after the previous
+     * one was destroyed by biometric re-enrollment / lock-screen change
+     * (PERMANENTLY_INVALIDATED). The recovered [kek] is the vault's real master
+     * KEK (from the in-vault sealed recovery kit or an imported recovery file),
+     * so the on-disk CONTENT ciphertext is still valid under it — we only re-wrap
+     * the KEK under the fresh key and rewrite the header, leaving the content
+     * untouched. [deviceAuthEncryptCipher] is an authenticated encrypt cipher on
+     * the newly minted device-auth key (the caller must delete the stale key
+     * first, then obtain + authenticate this cipher via BiometricPrompt).
+     *
+     * The recovery kit is re-sealed with a fresh `R` afterwards so the kit and
+     * any earlier exported file no longer share a recovery secret. [kek] is
+     * copied into the returned vault; the caller still owns and must wipe it.
+     */
+    fun rebindFromKek(
+        ctx: Context,
+        kek: ByteArray,
+        deviceAuthEncryptCipher: javax.crypto.Cipher,
+    ): UnlockedVault {
+        require(kek.size == MASTER_KEK_BYTES) { "kek must be $MASTER_KEK_BYTES bytes" }
+        sweepTmp(ctx)
+        // Preserve the existing content ciphertext; it is already encrypted under
+        // this same KEK, so a re-wrap of the KEK is all that is required.
+        val (_, contentCt) = readFileV2(ctx)
+        val wrappedKekCt = deviceAuthEncryptCipher.doFinal(kek)
+        val wrappedKekIv = deviceAuthEncryptCipher.iv
+        writeFileV2(ctx, wrappedKekIv, wrappedKekCt, contentCt)
+
+        // Re-seal the at-rest kit with a fresh R now that the vault is re-bound.
+        runCatching {
+            com.understory.backup.RecoveryFile.reseal(ctx, ctx.packageName, kek)
+        }.onFailure {
+            com.understory.security.Diagnostics.error(
+                "passgen.Vault", "recovery-kit reseal failed: ${it.message}",
+            )
+        }
+
+        // Decrypt content with the recovered KEK to build the in-memory vault.
+        val pt = Crypto.aesGcmDecrypt(kek, contentCt)
+        val contents = try {
+            parse(String(pt, Charsets.UTF_8))
+        } finally {
+            Crypto.wipe(pt)
+        }
+        return UnlockedVault(
+            ctx,
+            headerV2 = HeaderV2(wrappedKekIv, wrappedKekCt),
+            kek = kek.copyOf(),
+            contents = contents,
+        )
+    }
 
     private fun base64(b: ByteArray): String =
         android.util.Base64.encodeToString(b, android.util.Base64.NO_WRAP)
@@ -398,6 +467,15 @@ class UnlockedVault internal constructor(
         val target = java.io.File(ctx.filesDir, "vault.bin")
         Vault.atomicReplace(tmp, target)
     }
+
+    /**
+     * A COPY of the vault's master KEK — the recovery material the self-sealing
+     * recovery file protects (same 32 bytes sealed as entry[0] and used to
+     * decrypt the vault). Handed to [com.understory.backup.RecoveryFile.seal] /
+     * [com.understory.backup.RecoveryFile.exportKit], which copy it internally;
+     * per that contract the CALLER owns and must [Crypto.wipe] this array.
+     */
+    fun recoveryMaterial(): ByteArray = kek.copyOf()
 
     fun lock() {
         Crypto.wipe(kek)
