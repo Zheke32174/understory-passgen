@@ -13,7 +13,7 @@ android {
         minSdk = 33
         targetSdk = 35
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0-alpha"
         // resourceConfigurations lock dropped (shared-gui §S-3): it hard-locks
         // the app to English and blocks future localization. Only `en` strings
         // exist today, so removing it is pure gain and unblocks translation.
