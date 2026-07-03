@@ -4,4 +4,64 @@
          `passgen` and applicationId com.understory.passgen stay unchanged. -->
     <string name="app_name">Understory Keys</string>
     <string name="ime_label">Understory Keys keyboard</string>
+
+    <!-- Generator screen -->
+    <string name="title_generator">passgen</string>
+    <string name="msg_generator_tagline">Hardened password generator. The password value never appears on screen.</string>
+    <string name="msg_integrity_warnings_header">⚠  Device integrity warnings:</string>
+    <string name="msg_integrity_warning_item">    • %1$s</string>
+    <string name="msg_integrity_footnote">Generation still works, but on a rooted device the threat surface is much larger. Hard-fail conditions (Lucky Patcher, Xposed, Frida, repackage) abort the app entirely.</string>
+    <string name="msg_a11y_active">⚠  %1$d third-party accessibility service(s) active. Accessibility services can read text on screen and inject taps. Tap to review.</string>
+    <string name="action_review_a11y">Review accessibility services</string>
+
+    <string name="label_length">Length</string>
+    <string name="fmt_chars">%1$d characters</string>
+    <string name="label_exact_length">Exact length (1–1000)</string>
+    <string name="label_lowercase">Lowercase  a–z</string>
+    <string name="label_uppercase">Uppercase  A–Z</string>
+    <string name="label_digits">Digits  0–9</string>
+    <string name="label_symbols">Symbols  !@#…</string>
+    <string name="label_auto_clear">Auto-clear clipboard</string>
+    <string name="label_seconds_before_clear">Seconds before clear</string>
+    <string name="label_keep_value">Save generated passwords to receipts (so you can recover them)</string>
+    <string name="msg_keep_value_on">Receipts will store the password value so you can recover a signup you did through passgen.</string>
+    <string name="msg_keep_value_off">Off = receipts record only when/where a password was generated, not the value.</string>
+
+    <string name="section_autofill">Autofill</string>
+    <string name="msg_autofill_active">Autofill: passgen is the active provider.</string>
+    <string name="action_change_autofill">Change autofill provider</string>
+    <string name="msg_autofill_other">Autofill: another provider holds the slot (likely your password manager). passgen is available in keyboard mode — no slot needed. Enable the passgen keyboard below.</string>
+    <string name="msg_autofill_dual_slot">On this device you can also add passgen as an Additional autofill service alongside your existing manager.</string>
+    <string name="action_replace_autofill">Replace current autofill provider with passgen</string>
+
+    <string name="section_ledger">Ledger:  import → review → hand off</string>
+    <string name="msg_ledger_desc">A local encrypted ledger that sits beside Bitwarden: import your passwords (Google, Proton, Bitwarden), keep a receipt of every password passgen generates, and hand off to Bitwarden any time via encrypted or plaintext export. Argon2id + AES-256-GCM + Android Keystore device-binding. The master key is never displayed; unlock requires device biometric / PIN.</string>
+    <string name="action_open_ledger">Open ledger</string>
+
+    <string name="section_keyboard">Recommended:  passgen keyboard</string>
+    <string name="msg_keyboard_desc">The coexistence path — no autofill slot needed. Switch to passgen as your keyboard on a password field: Generate a new password, or Type a saved entry from your ledger. The value is typed directly into the field, bypassing clipboard AND autofill IPC. Works in apps that block autofill and works whether or not Bitwarden holds autofill.</string>
+    <string name="action_enable_keyboard">Enable passgen as keyboard</string>
+    <string name="action_manage_keyboard">Keyboard enabled — manage input methods</string>
+    <string name="action_switch_keyboard">Switch to passgen keyboard now</string>
+    <string name="msg_keyboard_picker_hint">The picker only shows when an input field is currently focused. If it doesn\'t appear, focus a password field first then return here.</string>
+    <string name="msg_keyboard_a11y_note">The passgen keyboard opts out of accessibility services by design (it won\'t be read by TalkBack or other screen readers). Screen-reader users should use autofill or clipboard mode.</string>
+
+    <string name="section_clipboard">Fallback:  Clipboard copy</string>
+    <string name="msg_clipboard_leak_warning">⚠  CLIPBOARD CAN LEAK ON SAMSUNG / GBOARD\n\nEven with the sensitive-content flag, both Samsung Keyboard and Gboard maintain a private clipboard panel that snapshots clipboard changes into a separate store. The auto-clear timer cannot remove entries from those panels — only the keyboard\'s own UI can. On Samsung this is the long-press paste menu / clipboard panel; on Gboard it\'s the clipboard chip.\n\nPrefer Custom keyboard or Autofill modes on Samsung devices.</string>
+    <string name="action_generate_copy">Generate &amp; Copy (clipboard)</string>
+    <string name="fmt_copied_autoclear">Copied (%1$d chars). Auto-clears in %2$ds while passgen is running — if you swipe passgen away first, clear your clipboard manually.</string>
+    <string name="fmt_copied">Copied (%1$d chars).</string>
+    <string name="msg_enable_charset">Enable at least one character set.</string>
+
+    <string name="msg_hardening">Hardening: FLAG_SECURE blocks screenshots and screen recording. The app holds no INTERNET, SMS, telephony, satellite, Bluetooth, NFC, contacts, or location permissions — verifiable in the install dialog.</string>
+    <string name="action_diagnostics">Diagnostics</string>
+
+    <!-- Diagnostic / fatal surface -->
+    <string name="title_diagnostic">passgen — startup halted</string>
+    <string name="fmt_diagnostic_reason">passgen stopped before showing the generator. %1$s</string>
+    <string name="msg_diagnostic_uncaught">An unexpected error occurred at startup.</string>
+
+    <!-- Vault activity fatal surface -->
+    <string name="title_vault_crash">Ledger couldn\'t open</string>
+    <string name="msg_vault_crash">The ledger hit an unexpected error while opening. Your stored entries are unchanged. Details below.</string>
 </resources>

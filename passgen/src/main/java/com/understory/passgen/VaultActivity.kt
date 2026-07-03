@@ -11,6 +11,9 @@ import com.understory.security.VaultRecovery
 import com.understory.security.VaultRecoveryScreen
 import com.understory.security.VaultResetHooks
 import com.understory.security.ui.Bg
+import com.understory.security.ui.components.FatalScreen
+import com.understory.security.ui.theme.UnderstoryAccent
+import com.understory.security.ui.theme.UnderstoryTheme
 
 import android.app.KeyguardManager
 import android.content.Context
@@ -49,7 +52,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -60,11 +62,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import kotlinx.coroutines.launch
@@ -102,11 +102,12 @@ class VaultActivity : FragmentActivity() {
             Diagnostics.error("passgen.VaultActivity",
                 "onCreate threw: ${t.javaClass.simpleName}: ${t.message}")
             setContent {
-                Surface(modifier = Modifier.fillMaxSize(), color = Color.Black) {
-                    Column(modifier = Modifier.padding(20.dp)) {
-                        Text("vault crash", color = Color(0xFFEF5350), fontSize = 18.sp)
-                        Text(t.toString(), color = Color(0xFFE0E0E0), fontSize = 11.sp)
-                    }
+                UnderstoryTheme(accent = UnderstoryAccent.PASSGEN) {
+                    FatalScreen(
+                        title = getString(R.string.title_vault_crash),
+                        reason = getString(R.string.msg_vault_crash),
+                        details = t.toString(),
+                    )
                 }
             }
         }
@@ -146,8 +147,11 @@ class VaultActivity : FragmentActivity() {
         val pendingImportUri: android.net.Uri? = intent?.getParcelableExtra(EXTRA_PENDING_IMPORT_URI)
 
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme()) {
-                Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF0A0A0A)) {
+            UnderstoryTheme(accent = UnderstoryAccent.PASSGEN) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background,
+                ) {
                     VaultRoot(
                         activity = this,
                         unlockedRef = ::unlocked,
@@ -427,16 +431,16 @@ private fun SetupScreen(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Ledger — first-time setup", color = Color(0xFFE0E0E0), fontSize = 22.sp)
+        Text("Ledger — first-time setup", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineSmall)
 
         if (deviceIssue != null) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF3D2A00), RoundedCornerShape(6.dp))
+                    .background(UnderstoryTheme.semantic.warning.copy(alpha = 0.14f), RoundedCornerShape(6.dp))
                     .padding(12.dp),
             ) {
-                Text(deviceIssue, color = Color(0xFFFFB74D), fontSize = 12.sp)
+                Text(deviceIssue, color = UnderstoryTheme.semantic.warning, style = MaterialTheme.typography.bodyMedium)
             }
             SecureOutlinedButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
                 Text("Close")
@@ -448,24 +452,24 @@ private fun SetupScreen(
             0 -> {
                 Text(
                     "Self-generated, self-sealed.",
-                    color = Color(0xFFE0E0E0), fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge,
                 )
                 // §3.4: honest copy — no false "10s reveal window", the RNG is
                 // not "the IME pipeline running".
                 Text(
                     "passgen generates a 256-bit master key with the same cryptographic RNG it uses to generate your passwords. The master is self-encrypted under a hardware-backed, screen-lock-bound Keystore key and sealed inside the ledger it just created. It is never shown and never typed.",
-                    color = Color(0xFF9E9E9E), fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium,
                 )
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFF1C1C1C), RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
                         .padding(12.dp),
                 ) {
                     Text(
                         // §3.4: the real recovery story, not vaporware.
                         "Lost device = lost vault.\n\nThe Keystore-wrapped copy of the master cannot leave this device. Recovery = the encrypted export file you create under Ledger → Export. Make one now or any time.",
-                        color = Color(0xFFFFB74D), fontSize = 11.sp,
+                        color = UnderstoryTheme.semantic.warning, style = MaterialTheme.typography.bodySmall,
                     )
                 }
                 SecureButton(onClick = { step = 1 }, modifier = Modifier.fillMaxWidth()) {
@@ -481,9 +485,9 @@ private fun SetupScreen(
             1 -> {
                 Text(
                     "Authenticate with your device to bind the vault master key.",
-                    color = Color(0xFF9E9E9E), fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium,
                 )
-                error?.let { Text(it, color = Color(0xFFEF5350), fontSize = 12.sp) }
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
                 LaunchedEffect(Unit) {
                     runCatching {
                         val cipher = Crypto.deviceAuthCipherForEncrypt()
@@ -525,12 +529,12 @@ private fun UnlockScreen(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Ledger — unlock", color = Color(0xFFE0E0E0), fontSize = 22.sp)
+        Text("Ledger — unlock", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineSmall)
         Text(
             "Authenticate with your device biometric or PIN to unlock.",
-            color = Color(0xFF9E9E9E), fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium,
         )
-        error?.let { Text(it, color = Color(0xFFEF5350), fontSize = 12.sp) }
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
 
         SecureButton(
             onClick = {
@@ -661,8 +665,8 @@ private fun ListScreen(
         modifier = Modifier.fillMaxSize().padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text("Ledger", color = Color(0xFFE0E0E0), fontSize = 22.sp)
-        Text("${entries.size} entries", color = Color(0xFF9E9E9E), fontSize = 12.sp)
+        Text("Ledger", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineSmall)
+        Text("${entries.size} entries", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SecureButton(onClick = onAdd, modifier = Modifier.fillMaxWidth().weight(1f)) {
                 Text("Add entry")
@@ -691,12 +695,12 @@ private fun ListScreen(
             Spacer(Modifier.height(8.dp))
             Box(
                 modifier = Modifier.fillMaxWidth()
-                    .background(Color(0xFF141414), RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
                     .padding(16.dp),
             ) {
                 Text(
                     "Your ledger is empty. Import from Google, Proton, or Bitwarden, or add an entry — then hand off to Bitwarden any time via Export.",
-                    color = Color(0xFF9E9E9E), fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium,
                 )
             }
         } else {
@@ -705,13 +709,13 @@ private fun ListScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color(0xFF1C1C1C), RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
                             .padding(14.dp),
                     ) {
                         Column(modifier = Modifier.fillMaxWidth()) {
-                            Text(e.title.ifEmpty { "(untitled)" }, color = Color(0xFFE0E0E0), fontSize = 14.sp)
+                            Text(e.title.ifEmpty { "(untitled)" }, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
                             if (e.username.isNotEmpty()) {
-                                Text(e.username, color = Color(0xFF9E9E9E), fontSize = 11.sp)
+                                Text(e.username, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                             }
                             Spacer(Modifier.height(6.dp))
                             SecureOutlinedButton(
@@ -781,7 +785,7 @@ private fun AddEntryScreen(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text("add entry", color = Color(0xFFE0E0E0), fontSize = 22.sp)
+        Text("add entry", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineSmall)
         OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Title") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("Username / email") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(value = url, onValueChange = { url = it }, label = { Text("URL (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -792,7 +796,7 @@ private fun AddEntryScreen(
         // existing credential, not only a freshly generated one.
         Text(
             "Store an existing password (e.g. one Bitwarden won't export), or generate a new ${snap.length}-char one.",
-            color = Color(0xFF9E9E9E), fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall,
         )
         OutlinedTextField(
             value = manualPassword,
@@ -804,10 +808,10 @@ private fun AddEntryScreen(
             modifier = Modifier.fillMaxWidth(),
         )
         TextButton(onClick = { showManual = !showManual }) {
-            Text(if (showManual) "Hide" else "Show", color = Color(0xFF9E9E9E), fontSize = 12.sp)
+            Text(if (showManual) "Hide" else "Show", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         }
 
-        error?.let { Text(it, color = Color(0xFFEF5350), fontSize = 12.sp) }
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
         Spacer(Modifier.height(8.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SecureButton(
@@ -983,7 +987,7 @@ private fun ImportScreen(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text("import passwords", color = Color(0xFFE0E0E0), fontSize = 22.sp)
+        Text("import passwords", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineSmall)
         Text(
             "Pick an export from a supported source. Files are parsed locally; " +
                 "nothing is uploaded.\n\n" +
@@ -992,7 +996,7 @@ private fun ImportScreen(
                 "  •  Bitwarden — CSV or JSON (unencrypted)\n\n" +
                 "You'll review what was found before anything is written. " +
                 "Duplicates (same URL + username) are skipped.",
-            color = Color(0xFF9E9E9E), fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium,
         )
 
         val pv = preview
@@ -1000,17 +1004,17 @@ private fun ImportScreen(
             // Confirmation card (§9).
             Box(
                 modifier = Modifier.fillMaxWidth()
-                    .background(Color(0xFF14210F), RoundedCornerShape(8.dp))
+                    .background(UnderstoryTheme.semantic.success.copy(alpha = 0.14f), RoundedCornerShape(8.dp))
                     .padding(14.dp),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         "Import ${pv.second.size} entries from ${previewName.ifEmpty { "the selected file" }}?",
-                        color = Color(0xFFE0E0E0), fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge,
                     )
                     Text(
                         "Source: ${pv.first}. Duplicates (same URL + username) will be skipped.",
-                        color = Color(0xFF9E9E9E), fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             }
@@ -1048,7 +1052,7 @@ private fun ImportScreen(
             CircularProgressIndicator()
         }
         status?.let {
-            Text(it, color = Color(0xFFE0E0E0), fontSize = 12.sp)
+            Text(it, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium)
         }
         SecureOutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
             Text(if (status?.startsWith("Imported") == true && !working) "Done" else "Cancel")
@@ -1142,13 +1146,13 @@ private fun ExportScreen(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Export / hand off", color = Color(0xFFE0E0E0), fontSize = 22.sp)
+        Text("Export / hand off", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineSmall)
 
         // Lane 1: encrypted backup (recommended) — the §3 recovery file.
-        Text("Encrypted backup (recommended)", color = Color(0xFFE0E0E0), fontSize = 16.sp)
+        Text("Encrypted backup (recommended)", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
         Text(
             "Writes an encrypted .ukbackup only your passphrase can open. This is the recovery file.",
-            color = Color(0xFF9E9E9E), fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium,
         )
         OutlinedTextField(
             value = passphrase,
@@ -1173,7 +1177,7 @@ private fun ExportScreen(
         Spacer(Modifier.height(8.dp))
 
         // Lane 2: plaintext hand-off to Bitwarden — dangerous, gated.
-        Text("Hand off to Bitwarden (plaintext)", color = Color(0xFFE0E0E0), fontSize = 16.sp)
+        Text("Hand off to Bitwarden (plaintext)", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
         com.understory.security.ui.components.SwitchRow(
             label = "Enable plaintext export",
             checked = plaintextArmed,
@@ -1183,15 +1187,15 @@ private fun ExportScreen(
         if (plaintextArmed) {
             Box(
                 modifier = Modifier.fillMaxWidth()
-                    .background(Color(0xFF3D0F0F), RoundedCornerShape(6.dp))
+                    .background(MaterialTheme.colorScheme.error.copy(alpha = 0.16f), RoundedCornerShape(6.dp))
                     .padding(12.dp),
             ) {
                 Text(
                     "This writes your passwords UNENCRYPTED so you can import them into Bitwarden, then delete the file. Anyone who reads the file reads your passwords.",
-                    color = Color(0xFFEF9A9A), fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium,
                 )
             }
-            Text("Format:", color = Color(0xFF9E9E9E), fontSize = 12.sp)
+            Text("Format:", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
             FormatRadio("Bitwarden CSV", "bitwarden_csv", plaintextFormat) { plaintextFormat = it }
             FormatRadio("Bitwarden JSON", "bitwarden_json", plaintextFormat) { plaintextFormat = it }
             FormatRadio("Generic CSV", "generic_csv", plaintextFormat) { plaintextFormat = it }
@@ -1218,8 +1222,8 @@ private fun ExportScreen(
         status?.let {
             Text(
                 it,
-                color = if (it.contains("saved")) Color(0xFF81C784) else Color(0xFFFFB74D),
-                fontSize = 12.sp,
+                color = if (it.contains("saved")) UnderstoryTheme.semantic.success else UnderstoryTheme.semantic.warning,
+                style = MaterialTheme.typography.bodyMedium,
             )
         }
         Spacer(Modifier.height(8.dp))
@@ -1239,7 +1243,7 @@ private fun FormatRadio(label: String, value: String, selected: String, onSelect
             selected = selected == value,
             onClick = { onSelect(value) },
         )
-        Text(label, color = Color(0xFFE0E0E0), fontSize = 13.sp)
+        Text(label, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -1342,10 +1346,10 @@ private fun RestoreScreen(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Restore from backup", color = Color(0xFFE0E0E0), fontSize = 22.sp)
+        Text("Restore from backup", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineSmall)
         Text(
             "Pick a .ukbackup file you exported earlier and enter its passphrase. The entries are restored into a fresh ledger on this device.",
-            color = Color(0xFF9E9E9E), fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium,
         )
         SecureButton(
             onClick = {
@@ -1374,7 +1378,7 @@ private fun RestoreScreen(
             Spacer(Modifier.height(4.dp))
             CircularProgressIndicator()
         }
-        status?.let { Text(it, color = Color(0xFFFFB74D), fontSize = 12.sp) }
+        status?.let { Text(it, color = UnderstoryTheme.semantic.warning, style = MaterialTheme.typography.bodyMedium) }
         SecureOutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
             Text("Cancel")
         }
@@ -1458,7 +1462,7 @@ private fun ReceiptsScreen(
         modifier = Modifier.fillMaxSize().padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text("Generated-password receipts", color = Color(0xFFE0E0E0), fontSize = 22.sp)
+        Text("Generated-password receipts", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineSmall)
 
         val list = receipts
         when {
@@ -1468,7 +1472,7 @@ private fun ReceiptsScreen(
             list.isEmpty() -> {
                 Text(
                     "No generated-password receipts yet. When you generate a password via the keyboard or autofill, a receipt lands here so you never lose it.",
-                    color = Color(0xFF9E9E9E), fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium,
                 )
             }
             else -> {
@@ -1476,23 +1480,23 @@ private fun ReceiptsScreen(
                     items(list, key = { it.id }) { r ->
                         Box(
                             modifier = Modifier.fillMaxWidth()
-                                .background(Color(0xFF1C1C1C), RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
                                 .padding(12.dp),
                         ) {
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 Text(
                                     r.target.ifEmpty { "unknown app" },
-                                    color = Color(0xFFE0E0E0), fontSize = 14.sp,
+                                    color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge,
                                 )
                                 Text(
                                     "${sourceLabel(r.source)} · ${relativeTime(r.createdAt)} · " +
                                         if (r.savedValue != null) "value saved" else "not saved",
-                                    color = Color(0xFF9E9E9E), fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall,
                                 )
                                 if (r.savedValue == null) {
                                     Text(
                                         "Value not stored (you had 'keep generated value' off). If you're locked out, use the site's account recovery.",
-                                        color = Color(0xFF707070), fontSize = 11.sp,
+                                        color = UnderstoryTheme.semantic.dim, style = MaterialTheme.typography.bodySmall,
                                     )
                                 }
                                 Spacer(Modifier.height(6.dp))
@@ -1501,16 +1505,16 @@ private fun ReceiptsScreen(
                                         SecureOutlinedButton(
                                             onClick = { revealValue(r) },
                                             modifier = Modifier.weight(1f),
-                                        ) { Text("Reveal", fontSize = 12.sp) }
+                                        ) { Text("Reveal", style = MaterialTheme.typography.bodyMedium) }
                                         SecureOutlinedButton(
                                             onClick = { saveToLedger(r) },
                                             modifier = Modifier.weight(1f),
-                                        ) { Text("Save", fontSize = 12.sp) }
+                                        ) { Text("Save", style = MaterialTheme.typography.bodyMedium) }
                                     }
                                     SecureOutlinedButton(
                                         onClick = { dismissId = r.id },
                                         modifier = Modifier.weight(1f),
-                                    ) { Text("Dismiss", fontSize = 12.sp) }
+                                    ) { Text("Dismiss", style = MaterialTheme.typography.bodyMedium) }
                                 }
                             }
                         }
@@ -1518,7 +1522,7 @@ private fun ReceiptsScreen(
                 }
             }
         }
-        status?.let { Text(it, color = Color(0xFF81C784), fontSize = 12.sp) }
+        status?.let { Text(it, color = UnderstoryTheme.semantic.success, style = MaterialTheme.typography.bodyMedium) }
         SecureOutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
             Text("Back")
         }
@@ -1654,34 +1658,34 @@ private fun ViewEntryScreen(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text(entry.title.ifEmpty { "(untitled)" }, color = Color(0xFFE0E0E0), fontSize = 22.sp)
+        Text(entry.title.ifEmpty { "(untitled)" }, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineSmall)
         if (entry.username.isNotEmpty()) {
-            Text("Username:  ${entry.username}", color = Color(0xFFE0E0E0), fontSize = 14.sp)
+            Text("Username:  ${entry.username}", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
         }
         if (entry.url.isNotEmpty()) {
-            Text("URL:  ${entry.url}", color = Color(0xFF9E9E9E), fontSize = 13.sp)
+            Text("URL:  ${entry.url}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         }
         if (entry.notes.isNotEmpty()) {
             Spacer(Modifier.height(4.dp))
-            Text("Notes:", color = Color(0xFF9E9E9E), fontSize = 12.sp)
-            Text(entry.notes, color = Color(0xFFE0E0E0), fontSize = 13.sp)
+            Text("Notes:", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+            Text(entry.notes, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium)
         }
         Spacer(Modifier.height(8.dp))
-        Text("Password:", color = Color(0xFF9E9E9E), fontSize = 12.sp)
-        Text("●●●●●●●●●●●●", color = Color(0xFFE0E0E0), fontSize = 14.sp)
+        Text("Password:", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+        Text("●●●●●●●●●●●●", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
         Text(
             "Threat model: passwords never render on screen. Use the " +
                 "copy or regenerate paths below — both require device " +
                 "auth and put the value on the clipboard with a 30-second " +
                 "auto-clear.",
-            color = Color(0xFF707070), fontSize = 11.sp,
+            color = UnderstoryTheme.semantic.dim, style = MaterialTheme.typography.bodySmall,
         )
         status?.let {
             Text(
                 it,
                 color = if (it.startsWith("Password copied") || it.startsWith("Regenerated"))
-                    Color(0xFF81C784) else Color(0xFFFFB74D),
-                fontSize = 12.sp,
+                    UnderstoryTheme.semantic.success else UnderstoryTheme.semantic.warning,
+                style = MaterialTheme.typography.bodyMedium,
             )
         }
         Spacer(Modifier.height(4.dp))

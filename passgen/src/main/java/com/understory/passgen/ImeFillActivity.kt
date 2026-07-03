@@ -23,16 +23,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import com.understory.security.Crypto
@@ -40,6 +37,8 @@ import com.understory.security.Diagnostics
 import com.understory.security.SecureButton
 import com.understory.security.Tamper
 import com.understory.security.secureClickable
+import com.understory.security.ui.theme.UnderstoryAccent
+import com.understory.security.ui.theme.UnderstoryTheme
 
 /**
  * Transparent trampoline that lets the IME type a SAVED entry (design §6.1).
@@ -92,8 +91,11 @@ class ImeFillActivity : FragmentActivity() {
         val targetPackage = intent.getStringExtra(EXTRA_TARGET_PACKAGE).orEmpty()
 
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme()) {
-                Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF0A0A0A)) {
+            UnderstoryTheme(accent = UnderstoryAccent.PASSGEN) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background,
+                ) {
                     ImeFillRoot(
                         targetPackage = targetPackage,
                         onPicked = { entry ->
@@ -159,12 +161,12 @@ class ImeFillActivity : FragmentActivity() {
             modifier = Modifier.fillMaxSize().padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("passgen — type a saved entry", color = Color(0xFFE0E0E0), fontSize = 22.sp)
+            Text("passgen — type a saved entry", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineSmall)
             Text(
                 "Authenticate to unlock your ledger and pick which saved entry to " +
                     "type. The password itself never reaches this screen — it goes " +
                     "straight into the field via the keyboard.",
-                color = Color(0xFF9E9E9E), fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium,
             )
             OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
                 Text("Cancel")
@@ -221,8 +223,8 @@ class ImeFillActivity : FragmentActivity() {
             modifier = Modifier.fillMaxSize().padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("passgen — type a saved entry", color = Color(0xFFE0E0E0), fontSize = 22.sp)
-            Text(message, color = Color(0xFFEF5350), fontSize = 12.sp)
+            Text("passgen — type a saved entry", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineSmall)
+            Text(message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
             OutlinedButton(onClick = onRetry, modifier = Modifier.fillMaxWidth()) { Text("Retry") }
             OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) { Text("Cancel") }
         }
@@ -251,21 +253,21 @@ class ImeFillActivity : FragmentActivity() {
             modifier = Modifier.fillMaxSize().padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("passgen — type a saved entry", color = Color(0xFFE0E0E0), fontSize = 22.sp)
+            Text("passgen — type a saved entry", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineSmall)
             if (targetPackage.isNotEmpty()) {
-                Text("App: $targetPackage", color = Color(0xFF9E9E9E), fontSize = 11.sp)
+                Text("App: $targetPackage", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
 
             if (all.isEmpty()) {
                 Spacer(Modifier.height(20.dp))
                 Box(
                     modifier = Modifier.fillMaxWidth()
-                        .background(Color(0xFF141414), RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
                         .padding(20.dp),
                 ) {
                     Text(
                         "Your ledger is empty. Use Generate & insert instead, or add entries in the app.",
-                        color = Color(0xFF707070), fontSize = 12.sp,
+                        color = UnderstoryTheme.semantic.dim, style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             } else {
@@ -274,13 +276,13 @@ class ImeFillActivity : FragmentActivity() {
                     modifier = Modifier.fillMaxWidth().weight(1f),
                 ) {
                     if (matched.isNotEmpty()) {
-                        item(key = "h-matched") { Text("Matches", color = Color(0xFF66BB6A), fontSize = 12.sp) }
+                        item(key = "h-matched") { Text("Matches", color = UnderstoryTheme.semantic.success, style = MaterialTheme.typography.bodyMedium) }
                         items(matched, key = { "m-${it.id}" }) { PickerRow(it, onPick) }
                     }
                     if (rest.isNotEmpty()) {
                         item(key = "h-rest") {
                             Spacer(Modifier.height(8.dp))
-                            Text("All entries", color = Color(0xFF707070), fontSize = 12.sp)
+                            Text("All entries", color = UnderstoryTheme.semantic.dim, style = MaterialTheme.typography.bodyMedium)
                         }
                         items(rest, key = { "r-${it.id}" }) { PickerRow(it, onPick) }
                     }
@@ -297,17 +299,17 @@ class ImeFillActivity : FragmentActivity() {
         // §10.5: secure semantics on a row that releases a credential.
         Box(
             modifier = Modifier.fillMaxWidth()
-                .background(Color(0xFF1C1C1C), RoundedCornerShape(6.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
                 .secureClickable { onPick(entry) }
                 .padding(12.dp),
         ) {
             Column {
-                Text(entry.title.ifEmpty { "(untitled)" }, color = Color(0xFFE0E0E0), fontSize = 14.sp)
+                Text(entry.title.ifEmpty { "(untitled)" }, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
                 if (entry.username.isNotEmpty()) {
-                    Text(entry.username, color = Color(0xFF9E9E9E), fontSize = 12.sp)
+                    Text(entry.username, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 }
                 if (entry.url.isNotEmpty()) {
-                    Text(entry.url, color = Color(0xFF707070), fontSize = 11.sp)
+                    Text(entry.url, color = UnderstoryTheme.semantic.dim, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }

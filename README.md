@@ -1,19 +1,34 @@
 # passgen
 
-A hardened Android password generator. **The generated password value never
-appears on screen anywhere** — not in a label, not in a toast, not in a text
-field, not in logcat. Two delivery modes:
+Store-facing name: **Understory Keys**. A hardened Android password generator +
+local encrypted ledger + migration buffer that sits **beside** your existing
+password manager (e.g. Bitwarden) — it does not require, and never seizes, the
+autofill slot. **The generated password value never appears on screen anywhere**
+— not in a label, not in a toast, not in a text field, not in logcat.
 
-1. **Autofill (preferred)** — passgen registers as an Android Autofill provider.
-   On any password field, tap the "passgen — generate" suggestion above the
-   keyboard. The value is generated in a hidden activity and handed to the
-   target field over the autofill IPC. Never touches the clipboard. Bypasses
-   Samsung Keyboard's clipboard panel entirely.
-2. **Clipboard fallback** — for cases where autofill isn't offered (some
+Three delivery modes:
+
+1. **Keyboard (the coexistence path)** — enable the passgen keyboard and switch
+   to it on a password field to Generate a new password or Type a saved ledger
+   entry directly into the field, bypassing both the clipboard and the autofill
+   IPC. Works whether or not another app holds the autofill slot.
+2. **Autofill** — if passgen holds the autofill slot, tap the
+   "passgen — generate" suggestion above the keyboard. The value is generated in
+   a hidden activity and handed to the target field over the autofill IPC, never
+   touching the clipboard. passgen leads with *who holds the slot* and never
+   nags you to replace an incumbent provider.
+3. **Clipboard fallback** — for cases where autofill isn't offered (some
    webviews, terminal apps, banking apps that block autofill). Sets
-   `EXTRA_IS_SENSITIVE` on the clip; auto-clears after a configurable timeout.
-   On Samsung devices the keyboard's clipboard panel may keep a copy regardless
-   of the sensitive flag — autofill is preferred.
+   `EXTRA_IS_SENSITIVE` on the clip; auto-clears after a configurable timeout —
+   **only while passgen's process is running**; if you swipe passgen away first,
+   clear the clipboard manually. On Samsung devices the keyboard's clipboard
+   panel may keep a copy regardless of the sensitive flag, so keyboard or
+   autofill mode is preferred there.
+
+Every password passgen generates and delivers is recorded in a device-encrypted
+**receipt ledger** (value stored only if you opt in) so a signup done through
+passgen can never silently lock you out, and the ledger imports/exports
+Bitwarden CSV+JSON so it is a migration buffer, not a roach motel.
 
 ## Hardening
 

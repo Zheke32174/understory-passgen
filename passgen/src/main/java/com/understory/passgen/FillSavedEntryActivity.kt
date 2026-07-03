@@ -30,22 +30,21 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import com.understory.security.Crypto
 import com.understory.security.Diagnostics
 import com.understory.security.Tamper
 import com.understory.security.secureClickable
+import com.understory.security.ui.theme.UnderstoryAccent
+import com.understory.security.ui.theme.UnderstoryTheme
 
 /**
  * Saved-entry autofill flow.
@@ -122,8 +121,11 @@ class FillSavedEntryActivity : FragmentActivity() {
         }
 
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme()) {
-                Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF0A0A0A)) {
+            UnderstoryTheme(accent = UnderstoryAccent.PASSGEN) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background,
+                ) {
                     AutofillRoot(
                         webDomain = webDomain,
                         appPackage = appPackage,
@@ -204,14 +206,14 @@ class FillSavedEntryActivity : FragmentActivity() {
             modifier = Modifier.fillMaxSize().padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("passgen — saved entry", color = Color(0xFFE0E0E0), fontSize = 22.sp)
+            Text("passgen — saved entry", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineSmall)
             Text(
                 "Authenticate to unlock the vault and pick which saved " +
                     "credential to fill. The password itself never reaches " +
                     "this screen — it goes from the unlocked vault directly " +
                     "to the requesting app's password field via the autofill " +
                     "framework.",
-                color = Color(0xFF9E9E9E), fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium,
             )
             OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
                 Text("Cancel")
@@ -272,8 +274,8 @@ class FillSavedEntryActivity : FragmentActivity() {
             modifier = Modifier.fillMaxSize().padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("passgen — saved entry", color = Color(0xFFE0E0E0), fontSize = 22.sp)
-            Text(message, color = Color(0xFFEF5350), fontSize = 12.sp)
+            Text("passgen — saved entry", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineSmall)
+            Text(message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
             OutlinedButton(onClick = onRetry, modifier = Modifier.fillMaxWidth()) {
                 Text("Retry")
             }
@@ -310,24 +312,24 @@ class FillSavedEntryActivity : FragmentActivity() {
             modifier = Modifier.fillMaxSize().padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("passgen — saved entry", color = Color(0xFFE0E0E0), fontSize = 22.sp)
+            Text("passgen — saved entry", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineSmall)
             if (webDomain.isNotEmpty()) {
-                Text("Web domain: $webDomain", color = Color(0xFF9E9E9E), fontSize = 11.sp)
+                Text("Web domain: $webDomain", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             } else if (appPackage.isNotEmpty()) {
-                Text("App: $appPackage", color = Color(0xFF9E9E9E), fontSize = 11.sp)
+                Text("App: $appPackage", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
 
             if (all.isEmpty()) {
                 Spacer(Modifier.height(20.dp))
                 Box(
                     modifier = Modifier.fillMaxWidth()
-                        .background(Color(0xFF141414), RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
                         .padding(20.dp),
                 ) {
                     Text(
                         "Vault is empty. Use 'passgen — generate' on the " +
                             "autofill menu to create a new password.",
-                        color = Color(0xFF707070), fontSize = 12.sp,
+                        color = UnderstoryTheme.semantic.dim, style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             } else {
@@ -338,7 +340,7 @@ class FillSavedEntryActivity : FragmentActivity() {
                     if (matched.isNotEmpty()) {
                         item(key = "header-matched") {
                             Text("Matches",
-                                color = Color(0xFF66BB6A), fontSize = 12.sp)
+                                color = UnderstoryTheme.semantic.success, style = MaterialTheme.typography.bodyMedium)
                         }
                         items(matched, key = { "m-${it.id}" }) { entry ->
                             EntryRow(entry, onPick)
@@ -348,7 +350,7 @@ class FillSavedEntryActivity : FragmentActivity() {
                         item(key = "header-rest") {
                             Spacer(Modifier.height(8.dp))
                             Text("All entries",
-                                color = Color(0xFF707070), fontSize = 12.sp)
+                                color = UnderstoryTheme.semantic.dim, style = MaterialTheme.typography.bodyMedium)
                         }
                         items(rest, key = { "r-${it.id}" }) { entry ->
                             EntryRow(entry, onPick)
@@ -368,20 +370,20 @@ class FillSavedEntryActivity : FragmentActivity() {
     private fun EntryRow(entry: VaultEntry, onPick: (VaultEntry) -> Unit) {
         Box(
             modifier = Modifier.fillMaxWidth()
-                .background(Color(0xFF1C1C1C), RoundedCornerShape(6.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
                 .secureClickable { onPick(entry) }
                 .padding(12.dp),
         ) {
             Column {
                 Text(entry.title.ifEmpty { "(untitled)" },
-                    color = Color(0xFFE0E0E0), fontSize = 14.sp)
+                    color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
                 if (entry.username.isNotEmpty()) {
                     Text(entry.username,
-                        color = Color(0xFF9E9E9E), fontSize = 12.sp)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 }
                 if (entry.url.isNotEmpty()) {
                     Text(entry.url,
-                        color = Color(0xFF707070), fontSize = 11.sp)
+                        color = UnderstoryTheme.semantic.dim, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }

@@ -14,7 +14,9 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
-        resourceConfigurations += listOf("en")
+        // resourceConfigurations lock dropped (shared-gui §S-3): it hard-locks
+        // the app to English and blocks future localization. Only `en` strings
+        // exist today, so removing it is pure gain and unblocks translation.
         base.archivesName = "passgen"
     }
 

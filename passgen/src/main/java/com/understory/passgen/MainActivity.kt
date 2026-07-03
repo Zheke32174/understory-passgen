@@ -27,29 +27,22 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.core.view.WindowCompat
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -63,13 +56,17 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.understory.security.ui.components.SuiteScaffold
+import com.understory.security.ui.components.FatalScreen
+import com.understory.security.ui.components.SwitchRow
+import com.understory.security.ui.components.SliderRow
+import com.understory.security.ui.theme.UnderstoryAccent
+import com.understory.security.ui.theme.UnderstoryTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -176,7 +173,7 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme()) {
+            UnderstoryTheme(accent = UnderstoryAccent.PASSGEN) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
@@ -228,45 +225,40 @@ class MainActivity : ComponentActivity() {
             sw.toString()
         }
 
+        // Build the (secret-free) detail block for FatalScreen's expandable
+        // section. INVARIANT preserved: only device fingerprint, installer,
+        // Build.TAGS, two cert digests, and the throwable's stack — no path a
+        // password value can reach.
+        val details = buildString {
+            appendLine("Title:  $title")
+            for (r in reasons) appendLine("• $r")
+            appendLine()
+            appendLine("Device:  $device")
+            appendLine("Installer source:  $installer")
+            appendLine("Build.TAGS:  $tagsValue (expected: release-keys)")
+            appendLine("Cert digest (this install):")
+            appendLine(sigDigest)
+            appendLine("Cert digest (expected):")
+            appendLine(SuitePins.EXPECTED_CERT_SHA256)
+            if (stack != null) {
+                appendLine()
+                appendLine("Stack trace:")
+                appendLine(stack)
+            }
+            appendLine()
+            append("Send a screenshot of this screen back to Claude so we can fix it. (FLAG_SECURE is OFF on the diagnostic screen so screenshots will work here.)")
+        }
+
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme()) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background,
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Text("passgen — diagnostic", color = Color(0xFFEF5350), fontSize = 22.sp)
-                        Text(title, color = Color(0xFFFFB74D), fontSize = 16.sp)
-                        for (r in reasons) {
-                            Text("• $r", color = Color(0xFFE0E0E0), fontSize = 13.sp)
-                        }
-                        Spacer(Modifier.height(8.dp))
-                        Text("Device:  $device", color = Color(0xFF9E9E9E), fontSize = 11.sp)
-                        Text("Installer source:  $installer", color = Color(0xFF9E9E9E), fontSize = 11.sp)
-                        Text("Build.TAGS:  $tagsValue (expected: release-keys)", color = Color(0xFF9E9E9E), fontSize = 11.sp)
-                        Text("Cert digest (this install):", color = Color(0xFF9E9E9E), fontSize = 11.sp)
-                        Text(sigDigest, color = Color(0xFFE0E0E0), fontSize = 10.sp)
-                        Text("Cert digest (expected):", color = Color(0xFF9E9E9E), fontSize = 11.sp)
-                        Text(SuitePins.EXPECTED_CERT_SHA256, color = Color(0xFFE0E0E0), fontSize = 10.sp)
-                        if (stack != null) {
-                            Spacer(Modifier.height(8.dp))
-                            Text("Stack trace:", color = Color(0xFF9E9E9E), fontSize = 11.sp)
-                            Text(stack, color = Color(0xFFE0E0E0), fontSize = 10.sp)
-                        }
-                        Spacer(Modifier.height(16.dp))
-                        Text(
-                            "Send a screenshot of this screen back to Claude so we can fix it. (FLAG_SECURE is OFF on the diagnostic screen so screenshots will work here.)",
-                            color = Color(0xFF707070),
-                            fontSize = 11.sp,
-                        )
-                    }
-                }
+            UnderstoryTheme(accent = UnderstoryAccent.PASSGEN) {
+                FatalScreen(
+                    title = stringResource(R.string.title_diagnostic),
+                    reason = stringResource(
+                        R.string.fmt_diagnostic_reason,
+                        title,
+                    ),
+                    details = details,
+                )
             }
         }
         // Diagnostic screen needs to be screenshot-able so user can send it back.
@@ -396,71 +388,68 @@ private fun GeneratorScreen(onDiagnostics: () -> Unit) {
     var a11yState by remember { mutableStateOf(A11yProbe.check(context)) }
     val tamperReport = remember { Tamper.check(context) }
 
-    Column(
+    SuiteScaffold(title = stringResource(R.string.app_name)) { pad ->
+      Column(
         modifier = Modifier
             .fillMaxSize()
+            .padding(pad)
             .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+            .padding(horizontal = UnderstoryTheme.spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(UnderstoryTheme.spacing.md),
     ) {
+        Spacer(Modifier.height(UnderstoryTheme.spacing.sm))
         Text(
-            text = "passgen",
-            color = Color(0xFFE0E0E0),
-            fontSize = 28.sp,
+            text = stringResource(R.string.title_generator),
+            style = MaterialTheme.typography.displaySmall,
+            color = MaterialTheme.colorScheme.onBackground,
         )
         Text(
-            text = "Hardened password generator. The password value never appears on screen.",
-            color = Color(0xFF9E9E9E),
-            fontSize = 13.sp,
+            text = stringResource(R.string.msg_generator_tagline),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         if (tamperReport.warnings.isNotEmpty()) {
-            Spacer(Modifier.height(4.dp))
             Text(
-                "⚠  Device integrity warnings:",
-                color = Color(0xFFFFB74D),
-                fontSize = 12.sp,
+                stringResource(R.string.msg_integrity_warnings_header),
+                style = MaterialTheme.typography.bodyMedium,
+                color = UnderstoryTheme.semantic.warning,
             )
             for (w in tamperReport.warnings) {
                 Text(
-                    "    • $w",
-                    color = Color(0xFFFFB74D),
-                    fontSize = 11.sp,
+                    stringResource(R.string.msg_integrity_warning_item, w),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = UnderstoryTheme.semantic.warning,
                 )
             }
             Text(
-                "Generation still works, but on a rooted device the threat surface is much larger. Hard-fail conditions (Lucky Patcher, Xposed, Frida, repackage) abort the app entirely.",
-                color = Color(0xFF707070),
-                fontSize = 11.sp,
+                stringResource(R.string.msg_integrity_footnote),
+                style = MaterialTheme.typography.bodySmall,
+                color = UnderstoryTheme.semantic.dim,
             )
         }
 
         if (a11yState.activeServiceCount > 0) {
-            Spacer(Modifier.height(4.dp))
             Text(
-                "⚠  ${a11yState.activeServiceCount} third-party accessibility service(s) active. " +
-                    "Accessibility services can read text on screen and inject taps. " +
-                    "Tap to review.",
-                color = Color(0xFFFFB74D),
-                fontSize = 12.sp,
+                stringResource(R.string.msg_a11y_active, a11yState.activeServiceCount),
+                style = MaterialTheme.typography.bodyMedium,
+                color = UnderstoryTheme.semantic.warning,
                 modifier = Modifier.fillMaxWidth(),
             )
             SecureOutlinedButton(
                 onClick = { A11yProbe.openA11ySettings(context) },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Review accessibility services")
+                Text(stringResource(R.string.action_review_a11y))
             }
         }
 
-        Spacer(Modifier.height(8.dp))
-
-        Text("Length: $length", color = Color(0xFFE0E0E0))
-        Slider(
+        SliderRow(
+            label = stringResource(R.string.label_length),
             value = length.toFloat(),
             onValueChange = { length = it.toInt().coerceIn(1, 1000) },
             valueRange = 1f..1000f,
-            steps = 0,
+            valueText = stringResource(R.string.fmt_chars, length),
         )
 
         OutlinedTextField(
@@ -470,29 +459,25 @@ private fun GeneratorScreen(onDiagnostics: () -> Unit) {
                 lengthText = cleaned
                 cleaned.toIntOrNull()?.let { length = it.coerceIn(1, 1000) }
             },
-            label = { Text("Exact length (1–1000)") },
+            label = { Text(stringResource(R.string.label_exact_length)) },
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth(),
         )
 
-        Spacer(Modifier.height(4.dp))
+        SwitchRow(stringResource(R.string.label_lowercase), lowers, onCheckedChange = { lowers = it })
+        SwitchRow(stringResource(R.string.label_uppercase), uppers, onCheckedChange = { uppers = it })
+        SwitchRow(stringResource(R.string.label_digits), digits, onCheckedChange = { digits = it })
+        SwitchRow(stringResource(R.string.label_symbols), symbols, onCheckedChange = { symbols = it })
 
-        ToggleRow("Lowercase  a–z", lowers) { lowers = it }
-        ToggleRow("Uppercase  A–Z", uppers) { uppers = it }
-        ToggleRow("Digits  0–9", digits) { digits = it }
-        ToggleRow("Symbols  !@#…", symbols) { symbols = it }
-
-        Spacer(Modifier.height(8.dp))
-
-        ToggleRow("Auto-clear clipboard", autoClearOn) { autoClearOn = it }
+        SwitchRow(stringResource(R.string.label_auto_clear), autoClearOn, onCheckedChange = { autoClearOn = it })
         if (autoClearOn) {
             OutlinedTextField(
                 value = autoClearSecondsText,
                 onValueChange = { raw ->
                     autoClearSecondsText = raw.filter { it.isDigit() }.take(4)
                 },
-                label = { Text("Seconds before clear") },
+                label = { Text(stringResource(R.string.label_seconds_before_clear)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth(),
@@ -501,24 +486,22 @@ private fun GeneratorScreen(onDiagnostics: () -> Unit) {
 
         // §5.1: "keep generated value" drives §2 receipts. Default off. Must be
         // armed BEFORE generating — the value is wiped immediately after delivery.
-        ToggleRow("Save generated passwords to receipts (so you can recover them)", keepGeneratedValue) {
-            keepGeneratedValue = it
-        }
-        Text(
-            if (keepGeneratedValue)
-                "Receipts will store the password value so you can recover a signup you did through passgen."
+        SwitchRow(
+            label = stringResource(R.string.label_keep_value),
+            checked = keepGeneratedValue,
+            onCheckedChange = { keepGeneratedValue = it },
+            supporting = if (keepGeneratedValue)
+                stringResource(R.string.msg_keep_value_on)
             else
-                "Off = receipts record only when/where a password was generated, not the value.",
-            color = Color(0xFF707070),
-            fontSize = 11.sp,
+                stringResource(R.string.msg_keep_value_off),
         )
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(UnderstoryTheme.spacing.sm))
 
         Text(
-            "Autofill",
-            color = Color(0xFFE0E0E0),
-            fontSize = 16.sp,
+            stringResource(R.string.section_autofill),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground,
         )
 
         // §7.1: status-first. Lead with who holds the slot, not a "set passgen
@@ -527,9 +510,9 @@ private fun GeneratorScreen(onDiagnostics: () -> Unit) {
         // claim to name the incumbent beyond "another provider".
         if (autofillEnabled) {
             Text(
-                "Autofill: passgen is the active provider.",
-                color = Color(0xFF9E9E9E),
-                fontSize = 12.sp,
+                stringResource(R.string.msg_autofill_active),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             SecureOutlinedButton(
                 onClick = {
@@ -542,22 +525,22 @@ private fun GeneratorScreen(onDiagnostics: () -> Unit) {
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Change autofill provider")
+                Text(stringResource(R.string.action_change_autofill))
             }
         } else {
             // §7.3: the Samsung dual-slot "Additional service" flow ships ONLY
             // behind a verified capability check. Until verified on-device it
             // returns false and we fall through to the always-true keyboard path.
             Text(
-                "Autofill: another provider holds the slot (likely your password manager). passgen is available in keyboard mode — no slot needed. Enable the passgen keyboard below.",
-                color = Color(0xFF9E9E9E),
-                fontSize = 12.sp,
+                stringResource(R.string.msg_autofill_other),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (supportsVerifiedDualAutofillSlots()) {
                 Text(
-                    "On this device you can also add passgen as an Additional autofill service alongside your existing manager.",
-                    color = Color(0xFF9E9E9E),
-                    fontSize = 12.sp,
+                    stringResource(R.string.msg_autofill_dual_slot),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             // Secondary, clearly-labeled — never the primary action.
@@ -575,21 +558,21 @@ private fun GeneratorScreen(onDiagnostics: () -> Unit) {
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Replace current autofill provider with passgen")
+                Text(stringResource(R.string.action_replace_autofill))
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(UnderstoryTheme.spacing.sm))
 
         Text(
-            "Ledger:  import → review → hand off",
-            color = Color(0xFFE0E0E0),
-            fontSize = 16.sp,
+            stringResource(R.string.section_ledger),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground,
         )
         Text(
-            "A local encrypted ledger that sits beside Bitwarden: import your passwords (Google, Proton, Bitwarden), keep a receipt of every password passgen generates, and hand off to Bitwarden any time via encrypted or plaintext export. Argon2id + AES-256-GCM + Android Keystore device-binding. The master key is never displayed; unlock requires device biometric / PIN.",
-            color = Color(0xFF9E9E9E),
-            fontSize = 12.sp,
+            stringResource(R.string.msg_ledger_desc),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         SecureOutlinedButton(
             onClick = {
@@ -599,20 +582,20 @@ private fun GeneratorScreen(onDiagnostics: () -> Unit) {
             },
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text("Open ledger")
+            Text(stringResource(R.string.action_open_ledger))
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(UnderstoryTheme.spacing.sm))
 
         Text(
-            "Recommended:  passgen keyboard",
-            color = Color(0xFFE0E0E0),
-            fontSize = 16.sp,
+            stringResource(R.string.section_keyboard),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground,
         )
         Text(
-            "The coexistence path — no autofill slot needed. Switch to passgen as your keyboard on a password field: Generate a new password, or Type a saved entry from your ledger. The value is typed directly into the field, bypassing clipboard AND autofill IPC. Works in apps that block autofill and works whether or not Bitwarden holds autofill.",
-            color = Color(0xFF9E9E9E),
-            fontSize = 12.sp,
+            stringResource(R.string.msg_keyboard_desc),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         SecureOutlinedButton(
             onClick = {
@@ -622,7 +605,10 @@ private fun GeneratorScreen(onDiagnostics: () -> Unit) {
             },
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(if (imeEnabled) "Keyboard enabled — manage input methods" else "Enable passgen as keyboard")
+            Text(
+                if (imeEnabled) stringResource(R.string.action_manage_keyboard)
+                else stringResource(R.string.action_enable_keyboard)
+            )
         }
         if (imeEnabled) {
             SecureOutlinedButton(
@@ -633,40 +619,38 @@ private fun GeneratorScreen(onDiagnostics: () -> Unit) {
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Switch to passgen keyboard now")
+                Text(stringResource(R.string.action_switch_keyboard))
             }
             Text(
-                "The picker only shows when an input field is currently focused. If it doesn't appear, focus a password field first then return here.",
-                color = Color(0xFF707070),
-                fontSize = 11.sp,
+                stringResource(R.string.msg_keyboard_picker_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = UnderstoryTheme.semantic.dim,
             )
         }
         // §6.4: honest known-limitation, not a silent gap.
         Text(
-            "The passgen keyboard opts out of accessibility services by design (it won't be read by TalkBack or other screen readers). Screen-reader users should use autofill or clipboard mode.",
-            color = Color(0xFF707070),
-            fontSize = 11.sp,
+            stringResource(R.string.msg_keyboard_a11y_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = UnderstoryTheme.semantic.dim,
         )
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(UnderstoryTheme.spacing.sm))
 
         Text(
-            "Fallback:  Clipboard copy",
-            color = Color(0xFFE0E0E0),
-            fontSize = 16.sp,
+            stringResource(R.string.section_clipboard),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground,
         )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFF3D2A00), RoundedCornerShape(6.dp))
-                .padding(10.dp),
+        Surface(
+            color = UnderstoryTheme.semantic.warning.copy(alpha = 0.14f),
+            contentColor = UnderstoryTheme.semantic.warning,
+            shape = MaterialTheme.shapes.small,
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Text(
-                "⚠  CLIPBOARD CAN LEAK ON SAMSUNG / GBOARD\n\n" +
-                    "Even with the sensitive-content flag, both Samsung Keyboard and Gboard maintain a private clipboard panel that snapshots clipboard changes into a separate store. The auto-clear timer cannot remove entries from those panels — only the keyboard's own UI can. On Samsung this is the long-press paste menu / clipboard panel; on Gboard it's the clipboard chip.\n\n" +
-                    "Prefer Custom keyboard or Autofill modes on Samsung devices.",
-                color = Color(0xFFFFB74D),
-                fontSize = 11.sp,
+                stringResource(R.string.msg_clipboard_leak_warning),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(UnderstoryTheme.spacing.md),
             )
         }
         SecureButton(
@@ -696,9 +680,9 @@ private fun GeneratorScreen(onDiagnostics: () -> Unit) {
                     // §5.2: honest auto-clear copy — the clear is a process-scoped
                     // Handler, so promise it only while passgen runs.
                     val msg = if (seconds != null) {
-                        "Copied ($length chars). Auto-clears in ${seconds}s while passgen is running — if you swipe passgen away first, clear your clipboard manually."
+                        context.getString(R.string.fmt_copied_autoclear, length, seconds)
                     } else {
-                        "Copied ($length chars)."
+                        context.getString(R.string.fmt_copied, length)
                     }
                     Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                 } finally {
@@ -709,29 +693,30 @@ private fun GeneratorScreen(onDiagnostics: () -> Unit) {
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(),
         ) {
-            Text("Generate & Copy (clipboard)")
+            Text(stringResource(R.string.action_generate_copy))
         }
 
         if (!anyEnabled) {
             Text(
-                "Enable at least one character set.",
-                color = Color(0xFFEF5350),
-                fontSize = 12.sp,
+                stringResource(R.string.msg_enable_charset),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
             )
         }
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(UnderstoryTheme.spacing.sm))
         Text(
-            "Hardening: FLAG_SECURE blocks screenshots and screen recording. The app holds no INTERNET, SMS, telephony, satellite, Bluetooth, NFC, contacts, or location permissions — verifiable in the install dialog.",
-            color = Color(0xFF707070),
-            fontSize = 11.sp,
+            stringResource(R.string.msg_hardening),
+            style = MaterialTheme.typography.bodySmall,
+            color = UnderstoryTheme.semantic.dim,
         )
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(UnderstoryTheme.spacing.sm))
         OutlinedButton(onClick = onDiagnostics, modifier = Modifier.fillMaxWidth()) {
-            Text("Diagnostics")
+            Text(stringResource(R.string.action_diagnostics))
         }
-        com.understory.security.SuiteStatusFooter()
+        Spacer(Modifier.height(UnderstoryTheme.spacing.md))
+      }
     }
 
     // Re-read autofill / IME / a11y state on every ON_START. The
@@ -779,15 +764,3 @@ private fun isPassgenImeEnabled(
  * is a one-line change with the capability check in one place.
  */
 private fun supportsVerifiedDualAutofillSlots(): Boolean = false
-
-@Composable
-private fun ToggleRow(label: String, value: Boolean, onChange: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(label, color = Color(0xFFE0E0E0))
-        Switch(checked = value, onCheckedChange = onChange)
-    }
-}
