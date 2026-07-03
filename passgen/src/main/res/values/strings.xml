@@ -31,7 +31,8 @@
     <string name="msg_autofill_active">Autofill: passgen is the active provider.</string>
     <string name="action_change_autofill">Change autofill provider</string>
     <string name="msg_autofill_other">Autofill: another provider holds the slot (likely your password manager). passgen is available in keyboard mode — no slot needed. Enable the passgen keyboard below.</string>
-    <string name="msg_autofill_dual_slot">On this device you can also add passgen as an Additional autofill service alongside your existing manager.</string>
+    <string name="msg_autofill_dual_slot">On Samsung you can add passgen alongside your existing manager without replacing it. Open autofill settings below, tap “More autofill services” (or “Additional autofill services”), and turn on Understory Keys. Your current manager keeps the primary slot.</string>
+    <string name="action_add_additional_autofill">Add passgen as an additional service</string>
     <string name="action_replace_autofill">Replace current autofill provider with passgen</string>
 
     <string name="section_ledger">Ledger:  import → review → hand off</string>

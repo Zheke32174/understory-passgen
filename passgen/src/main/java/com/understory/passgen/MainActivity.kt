@@ -729,9 +729,12 @@ private fun GenerateTab(modifier: Modifier = Modifier) {
                     Text(stringResource(R.string.action_change_autofill))
                 }
             } else {
-                // §7.3: the Samsung dual-slot "Additional service" flow ships ONLY
-                // behind a verified capability check. Until verified on-device it
-                // returns false and we fall through to the always-true keyboard path.
+                // Another provider holds the primary slot. On Samsung One UI the
+                // OS additionally exposes an "Additional autofill services" list;
+                // passgen advertises itself for it (settingsActivity +
+                // <compatibility-package> in autofill_service.xml). We surface the
+                // dual-slot path FIRST there so the user can add passgen alongside
+                // their existing manager without displacing it.
                 Text(
                     stringResource(R.string.msg_autofill_other),
                     style = MaterialTheme.typography.bodyMedium,
@@ -743,9 +746,24 @@ private fun GenerateTab(modifier: Modifier = Modifier) {
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Spacer(Modifier.height(UnderstoryTheme.spacing.sm))
+                    // Primary CTA on Samsung: open the system autofill settings
+                    // where the "Additional autofill services" toggle lives. No
+                    // undocumented Samsung deep-link exists, so we open the
+                    // documented autofill settings screen and tell the user exactly
+                    // where to tap (msg_autofill_dual_slot copy above).
+                    SecureOutlinedButton(
+                        onClick = { launchAdditionalAutofillSettings(context) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.action_add_additional_autofill))
+                    }
+                    Spacer(Modifier.height(UnderstoryTheme.spacing.xs))
                 }
                 Spacer(Modifier.height(UnderstoryTheme.spacing.sm))
-                // Secondary, clearly-labeled — never the primary action.
+                // Replacing the primary provider is the always-available fallback,
+                // demoted below the dual-slot path on Samsung. Clearly labeled —
+                // this one DOES displace the incumbent.
                 SecureOutlinedButton(
                     onClick = { launchAutofillSettings(context) },
                     modifier = Modifier.fillMaxWidth(),
@@ -1117,6 +1135,41 @@ private fun launchAutofillSettings(context: android.content.Context) {
     }
 }
 
+/**
+ * Open the system autofill settings screen that hosts Samsung One UI's
+ * "Additional autofill services" list, so the user can add passgen as a
+ * secondary service ALONGSIDE their existing primary provider.
+ *
+ * There is no public, documented Samsung intent that deep-links straight to the
+ * "Additional autofill services" sub-screen, so we do NOT fabricate one. We open
+ * the documented autofill settings surface; the in-app copy (msg_autofill_dual_slot)
+ * tells the user to tap "More autofill services" / "Additional autofill services"
+ * and enable Understory Keys there. If that action can't resolve on this device
+ * we fall back to the primary-slot picker rather than stranding the user — the
+ * OEM check upstream already limited this button to devices that expose the slot.
+ */
+private fun launchAdditionalAutofillSettings(context: android.content.Context) {
+    // ACTION_REQUEST_SET_AUTOFILL_SERVICE lands on One UI's autofill service
+    // screen, which is where the "Additional autofill services" entry lives; the
+    // package-scoped data URI keeps the request tied to us. Same documented
+    // intent as the primary path — the difference is honest on-screen guidance,
+    // not an undocumented deep-link.
+    val ok = runCatching {
+        val intent = Intent(AndroidSettings.ACTION_REQUEST_SET_AUTOFILL_SERVICE).apply {
+            data = Uri.parse("package:" + context.packageName)
+        }
+        context.startActivity(intent)
+        true
+    }.getOrDefault(false)
+
+    if (!ok) {
+        // Degrade honestly: the documented autofill picker without a package URI.
+        runCatching {
+            context.startActivity(Intent(AndroidSettings.ACTION_REQUEST_SET_AUTOFILL_SERVICE))
+        }
+    }
+}
+
 private fun isPassgenImeEnabled(
     ctx: android.content.Context,
     imm: InputMethodManager?,
@@ -1128,17 +1181,20 @@ private fun isPassgenImeEnabled(
 }
 
 /**
- * §7.3: whether this device's system settings expose a verified "Additional
- * service" autofill slot that can hold passgen ALONGSIDE the incumbent.
+ * §7.3: whether this device's system settings expose an "Additional autofill
+ * services" slot that can hold passgen ALONGSIDE the incumbent primary provider.
  *
- * The dual-slot instructions were unverified on real One UI 7 (SM-S948U;
- * SAMSUNG_QUIRKS.md has no autofill entry). Rather than assert a settings path
- * that may not exist, this returns false until an on-device verification lands
- * (an operator action tracked in SAMSUNG_QUIRKS.md). Returning false makes the
- * UI fall through to the always-true keyboard-mode path — the safe channel —
- * instead of stranding the user with instructions that may be wrong.
+ * Samsung One UI exposes this secondary slot; stock Android does not. passgen now
+ * advertises itself for it correctly — the autofill service declares a settings
+ * activity and a <compatibility-package> allowlist (res/xml/autofill_service.xml),
+ * which is what makes One UI list it under "Additional autofill services". The
+ * capability is delegated to [com.understory.security.DeviceProfile] so the OEM
+ * check lives in one place shared across the suite.
  *
- * Kept as a function (not a hardcoded false) so flipping it after verification
- * is a one-line change with the capability check in one place.
+ * On a device that does NOT offer the secondary slot this returns false and the
+ * UI degrades honestly: we don't show the dual-slot copy or button, and the
+ * always-available keyboard path remains the coexistence channel. We never
+ * fabricate a settings path that the OS doesn't provide.
  */
-private fun supportsVerifiedDualAutofillSlots(): Boolean = false
+private fun supportsVerifiedDualAutofillSlots(): Boolean =
+    com.understory.security.DeviceProfile.supportsDualAutofillSlots()

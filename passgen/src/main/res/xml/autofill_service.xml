@@ -1,3 +1,52 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Autofill service metadata.
+
+  android:settingsActivity — the fully-qualified Activity the OS launches when
+  the user taps the gear / "settings" affordance next to this service in the
+  system autofill picker. One UI's "Additional autofill services" list surfaces
+  services that carry this settings entry point and a compatibility declaration;
+  without it passgen only qualified for the single primary slot. The activity
+  is exported and routes into the app's delivery-methods screen.
+
+  supportsInlineSuggestions="false" — we deliberately do NOT render inline
+  (keyboard-strip) suggestions. Our datasets carry a neutral label and the value
+  is delivered through the autofill authentication channel, never painted into a
+  suggestion surface. Inline suggestions would put a passgen-owned RemoteView
+  inside the keyboard process; keeping this false preserves the no-value-on-screen
+  posture.
+
+  <compatibility-package> — requests accessibility-backed compatibility mode for
+  the listed browser packages (up to android:maxLongVersionCode). Browsers
+  render their own form fields and historically don't expose them to the autofill
+  framework natively, so without compat mode passgen would never see a password
+  field inside them. Declaring this block is ALSO what makes Samsung One UI list
+  the service under "Additional autofill services" (the secondary/keyboard-compat
+  slot) rather than only the primary slot. The list is an allowlist — only these
+  named browsers get the fallback; every other app uses the standard autofill
+  path. Password VALUES arrive masked under compat mode, but passgen never reads
+  existing field values (it only writes generated / saved values), so masking
+  does not affect correctness or safety.
+-->
 <autofill-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:supportsInlineSuggestions="false" />
+    android:settingsActivity="com.understory.passgen.AutofillSettingsActivity"
+    android:supportsInlineSuggestions="false">
+    <compatibility-package
+        android:name="com.android.chrome"
+        android:maxLongVersionCode="9223372036854775807" />
+    <compatibility-package
+        android:name="com.sec.android.app.sbrowser"
+        android:maxLongVersionCode="9223372036854775807" />
+    <compatibility-package
+        android:name="org.mozilla.firefox"
+        android:maxLongVersionCode="9223372036854775807" />
+    <compatibility-package
+        android:name="com.brave.browser"
+        android:maxLongVersionCode="9223372036854775807" />
+    <compatibility-package
+        android:name="com.microsoft.emmx"
+        android:maxLongVersionCode="9223372036854775807" />
+    <compatibility-package
+        android:name="com.duckduckgo.mobile.android"
+        android:maxLongVersionCode="9223372036854775807" />
+</autofill-service>

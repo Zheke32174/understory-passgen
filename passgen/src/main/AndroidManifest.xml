@@ -272,6 +272,26 @@
             android:theme="@style/Theme.PassGen.Translucent" />
 
 
+        <!--
+          Autofill settings door. Referenced by res/xml/autofill_service.xml
+          (android:settingsActivity). The system Settings process (a different
+          UID) launches it from the autofill picker / Samsung "Additional
+          autofill services" gear, so it MUST be exported. It owns no UI and
+          carries no secret — it forwards to MainActivity and finishes. Same
+          hard-fail guards as the other entry points apply at runtime.
+        -->
+        <activity
+            android:name=".AutofillSettingsActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:finishOnTaskLaunch="true"
+            android:launchMode="singleInstance"
+            android:taskAffinity=""
+            android:allowTaskReparenting="false"
+            android:resizeableActivity="false"
+            android:theme="@style/Theme.PassGen.Invisible" />
+
         <service
             android:name=".PassgenAutofillService"
             android:exported="true"
