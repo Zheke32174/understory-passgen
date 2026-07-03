@@ -78,8 +78,23 @@ class GenerateAndFillActivity : Activity() {
             return
         }
 
+        val target = intent.getStringExtra(EXTRA_TARGET) ?: ""
+        val kind = intent.getStringExtra(EXTRA_TARGET_KIND) ?: "unknown"
+
         val chars = PasswordGenerator.generate(opts)
         val value: AutofillValue = try {
+            // §2.2: write a receipt BEFORE the wipe so the user is never silently
+            // locked out. Synchronous on purpose: this invisible activity is
+            // about to finish() and the process may die, so we must guarantee the
+            // write is durable first (§8). Read `chars` for the receipt before the
+            // finally-block wipes it. Best-effort — a receipt failure must not
+            // fail the fill.
+            runCatching {
+                Receipts.append(
+                    applicationContext, "autofill", target, kind, snap,
+                    if (snap.keepGeneratedValue) chars else null,
+                )
+            }
             // String construction is unavoidable here — AutofillValue.forText takes
             // a CharSequence. We minimize lifetime: build it once, return, wipe.
             AutofillValue.forText(String(chars))
@@ -107,5 +122,7 @@ class GenerateAndFillActivity : Activity() {
 
     companion object {
         const val EXTRA_AUTOFILL_IDS = "passgen.autofill_ids"
+        const val EXTRA_TARGET = "passgen.autofill_target"
+        const val EXTRA_TARGET_KIND = "passgen.autofill_target_kind"
     }
 }

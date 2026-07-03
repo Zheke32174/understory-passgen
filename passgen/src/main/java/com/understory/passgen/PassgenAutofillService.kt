@@ -139,6 +139,16 @@ class PassgenAutofillService : AutofillService() {
                 GenerateAndFillActivity.EXTRA_AUTOFILL_IDS,
                 ArrayList(passwordIds),
             )
+            // §2.2: carry the resolved target so the generate activity can write
+            // a receipt against the right site/app. Prefer web domain (browser
+            // fills) over the hosting app package (native fills).
+            val (target, kind) = when {
+                webDomain.isNotEmpty() -> webDomain to "domain"
+                appPackage.isNotEmpty() -> appPackage to "package"
+                else -> "" to "unknown"
+            }
+            putExtra(GenerateAndFillActivity.EXTRA_TARGET, target)
+            putExtra(GenerateAndFillActivity.EXTRA_TARGET_KIND, kind)
         }
         val genAuthPending = PendingIntent.getActivity(
             this,

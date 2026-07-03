@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">passgen</string>
-    <string name="ime_label">passgen keyboard</string>
+    <!-- Store-facing / launcher name (design §11.6, SUITE §4.5). Codename
+         `passgen` and applicationId com.understory.passgen stay unchanged. -->
+    <string name="app_name">Understory Keys</string>
+    <string name="ime_label">Understory Keys keyboard</string>
 </resources>

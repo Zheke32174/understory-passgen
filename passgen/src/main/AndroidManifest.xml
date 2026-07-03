@@ -251,6 +251,26 @@
             android:resizeableActivity="false"
             android:theme="@style/Theme.PassGen" />
 
+        <!--
+          IME saved-entry trampoline (design §6.1). An IME service cannot host a
+          BiometricPrompt / FragmentActivity, so the "Type a saved entry" button
+          launches this transparent, FLAG_SECURE, excluded-from-recents activity.
+          It unlocks the vault, shows the picker, hands the chosen value back to
+          the IME via a short-lived static slot, and finishes. Translucent theme
+          keeps it visually unobtrusive over the app that hosts the field.
+        -->
+        <activity
+            android:name=".ImeFillActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:finishOnTaskLaunch="true"
+            android:launchMode="singleInstance"
+            android:taskAffinity=""
+            android:allowTaskReparenting="false"
+            android:resizeableActivity="false"
+            android:theme="@style/Theme.PassGen.Translucent" />
+
 
         <service
             android:name=".PassgenAutofillService"
@@ -284,7 +304,7 @@
         -->
         <provider
             android:name=".SuiteCapsProvider"
-            android:authorities="com.understory.passgen.suitecaps"
+            android:authorities="${applicationId}.suitecaps"
             android:exported="true"
             android:readPermission="com.understory.suite.CAPS"
             android:writePermission="com.understory.suite.CAPS_WRITE"

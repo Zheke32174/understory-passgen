@@ -216,4 +216,75 @@ login,GitHub,https://github.com,octo,p2,,,,,Personal
         assertEquals(a, b)
         assertNotEquals(a, c)
     }
+
+    // ---------- Bitwarden CSV ----------
+
+    @Test
+    fun detectsBitwardenCsvHeader() {
+        val sample = "folder,favorite,type,name,notes,fields,reprompt," +
+            "login_uri,login_username,login_password,login_totp\n" +
+            "Personal,0,login,Gmail,,,0,https://mail.google.com,me,p,\n"
+        assertEquals(ImportFormats.Format.BITWARDEN_CSV, ImportFormats.detect(sample))
+    }
+
+    @Test
+    fun bitwardenCsvHappyPath_skipsNonLoginRow_handlesQuotedNotesAndMultiUri() {
+        // Row 1: quoted note with an embedded comma. Row 2: a non-login (card)
+        // row that must be skipped. Row 3: a login whose login_uri holds the
+        // first of several URIs the exporter joined with a newline in-cell.
+        val csv = "folder,favorite,type,name,notes,fields,reprompt," +
+            "login_uri,login_username,login_password,login_totp\r\n" +
+            "Personal,0,login,GitHub,\"personal, work\",,0,https://github.com,octocat,p@ss,\r\n" +
+            "Cards,0,card,Visa,,,0,,,,\r\n" +
+            "Work,1,login,Multi,,,0,\"https://a.example\nhttps://b.example\",bob,secret,\r\n"
+        val out = ImportFormats.parseBitwardenCsv(csv)
+        assertEquals(2, out.size)
+        assertEquals("GitHub", out[0].title)
+        assertEquals("personal, work", out[0].notes)
+        assertEquals("octocat", out[0].username)
+        assertEquals("p@ss", out[0].password)
+        assertEquals("https://github.com", out[0].url)
+        assertEquals("Multi", out[1].title)
+        assertTrue(out[1].url.startsWith("https://a.example"))
+    }
+
+    // ---------- Bitwarden JSON ----------
+
+    @Test
+    fun detectsBitwardenJsonShape() {
+        val sample = """{"encrypted":false,"items":[
+            {"type":1,"name":"Gmail","login":{"username":"u","password":"p","uris":[{"uri":"https://x"}]}}
+        ]}"""
+        assertEquals(ImportFormats.Format.BITWARDEN_JSON, ImportFormats.detect(sample))
+    }
+
+    @Test
+    fun bitwardenJsonHappyPath_keepsOnlyLoginType_readsFirstUri() {
+        val json = """{"encrypted":false,"items":[
+            {"type":1,"name":"GitHub","notes":"n","login":{"username":"octocat","password":"p@ss",
+              "uris":[{"uri":"https://github.com"},{"uri":"https://gist.github.com"}]}},
+            {"type":2,"name":"A secure note","notes":"not a login"},
+            {"type":1,"name":"NoUri","login":{"username":"bob","password":"s"}}
+        ]}"""
+        val out = ImportFormats.parseBitwardenJson(json)
+        assertEquals(2, out.size)
+        assertEquals("GitHub", out[0].title)
+        assertEquals("octocat", out[0].username)
+        assertEquals("p@ss", out[0].password)
+        assertEquals("https://github.com", out[0].url)
+        assertEquals("n", out[0].notes)
+        assertEquals("NoUri", out[1].title)
+        assertEquals("", out[1].url)
+    }
+
+    @Test
+    fun bitwardenJsonEncryptedRejected() {
+        val json = """{"encrypted":true,"items":[]}"""
+        try {
+            ImportFormats.parseBitwardenJson(json)
+            fail("encrypted Bitwarden export must be rejected")
+        } catch (e: IllegalArgumentException) {
+            assertTrue(e.message!!.contains("encrypted"))
+        }
+    }
 }

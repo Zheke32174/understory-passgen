@@ -1,7 +1,5 @@
 package com.understory.passgen
 
-import com.understory.security.Crypto
-import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -10,27 +8,21 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * End-to-end test for [BackupFormat]. Uses Robolectric for
- * android.util.Base64 and org.json. Argon2id runs at the production
- * cost params (no test-only override, same trade-off as
- * [com.understory.backup.AesGcmPassphraseCodecTest]).
+ * End-to-end test for [BackupFormat] v2. Uses Robolectric for
+ * android.util.Base64 and org.json. Argon2id runs at production cost params.
  *
- * The format's job is to ship a vault between devices: it bundles the
- * vault master KEK, the TOTP secret, and all entries under a single
- * passphrase-derived layer. Failure modes that matter:
+ * V2 is a passphrase-encrypted export of vault ENTRIES only — no vault-master
+ * KEK, no TOTP secret (those were the dead A27 prerequisite). Failure modes:
  *   - wrong passphrase fails authenticated decrypt
  *   - corrupted ciphertext rejected
- *   - version mismatch rejected
- *   - oversize / too-short claims rejected
- *   - decoded master KEK / TOTP secret length-validated
+ *   - version mismatch rejected (incl. legacy v1 files)
+ *   - oversize / too-short / trailing-byte claims rejected
  */
 @RunWith(RobolectricTestRunner::class)
 class BackupFormatTest {
 
     private fun samplePayload() = BackupFormat.Payload(
         exportedAtMs = 1_700_000_000_000L,
-        vaultMasterKek = ByteArray(Crypto.KEK_BYTES) { it.toByte() },
-        totpSecret = ByteArray(20) { it.toByte() },
         entries = listOf(
             VaultEntry(
                 id = "e1",
@@ -51,6 +43,7 @@ class BackupFormatTest {
                 notes = "primary checking",
                 created = 1_700_000_500_000L,
                 updated = 1_700_000_600_000L,
+                source = "import:bitwarden",
             ),
         ),
     )
@@ -60,16 +53,10 @@ class BackupFormatTest {
         val original = samplePayload()
         val blob = BackupFormat.encode("right passphrase".toCharArray(), original)
         val restored = BackupFormat.decode("right passphrase".toCharArray(), blob)
-        try {
-            assertEquals(original.exportedAtMs, restored.exportedAtMs)
-            assertArrayEquals(original.vaultMasterKek, restored.vaultMasterKek)
-            assertArrayEquals(original.totpSecret, restored.totpSecret)
-            assertEquals(original.entries.size, restored.entries.size)
-            for ((a, b) in original.entries.zip(restored.entries)) {
-                assertEquals(a, b)
-            }
-        } finally {
-            restored.wipe()
+        assertEquals(original.exportedAtMs, restored.exportedAtMs)
+        assertEquals(original.entries.size, restored.entries.size)
+        for ((a, b) in original.entries.zip(restored.entries)) {
+            assertEquals(a, b)
         }
     }
 
@@ -92,6 +79,19 @@ class BackupFormatTest {
         try {
             BackupFormat.decode("pw".toCharArray(), blob)
             fail("unsupported version must be rejected")
+        } catch (_: IllegalArgumentException) {
+            // expected
+        }
+    }
+
+    @Test
+    fun legacyV1FileRejected() {
+        // A v1 file (version byte 1) must be refused cleanly by the v2 reader.
+        val blob = BackupFormat.encode("pw".toCharArray(), samplePayload())
+        blob[0] = 1
+        try {
+            BackupFormat.decode("pw".toCharArray(), blob)
+            fail("legacy v1 file must be rejected")
         } catch (_: IllegalArgumentException) {
             // expected
         }
@@ -122,9 +122,7 @@ class BackupFormatTest {
     @Test
     fun ciphertextTamperFailsAuthenticatedDecrypt() {
         val blob = BackupFormat.encode("pw".toCharArray(), samplePayload())
-        // Flip a byte deep inside the ciphertext (well past the 49-byte
-        // header: 1 version + 32 salt + 4*4 argon params = 49). Any
-        // GCM tag check should reject.
+        // Flip the last byte (inside the GCM tag). Any tag check should reject.
         val target = blob.size - 1
         blob[target] = (blob[target].toInt() xor 0x01).toByte()
         try {
@@ -137,10 +135,6 @@ class BackupFormatTest {
 
     @Test
     fun saltIsFreshPerEncrypt_soSameInputsProduceDifferentBlobs() {
-        // Two encodes of the same payload + passphrase must produce
-        // different on-disk bytes — otherwise users with identical
-        // backups (or a vault diff comparison) leak that the contents
-        // are unchanged.
         val a = BackupFormat.encode("pw".toCharArray(), samplePayload())
         val b = BackupFormat.encode("pw".toCharArray(), samplePayload())
         assertTrue("two encodes of same payload must differ on disk",
@@ -152,13 +146,5 @@ class BackupFormatTest {
         val a = BackupFormat.encode("alpha".toCharArray(), samplePayload())
         val b = BackupFormat.encode("beta".toCharArray(), samplePayload())
         assertTrue(!a.contentEquals(b))
-    }
-
-    @Test
-    fun payloadWipeZeroesSensitiveBytes() {
-        val payload = samplePayload()
-        payload.wipe()
-        for (b in payload.vaultMasterKek) assertEquals(0.toByte(), b)
-        for (b in payload.totpSecret) assertEquals(0.toByte(), b)
     }
 }

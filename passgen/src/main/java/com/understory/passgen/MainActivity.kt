@@ -2,7 +2,6 @@ package com.understory.passgen
 
 import com.understory.security.A11yProbe
 import com.understory.security.Clipboard
-import com.understory.security.DeviceProfile
 import com.understory.security.Diagnostics
 import com.understory.security.DiagnosticsDump
 import com.understory.security.DiagnosticsScreen
@@ -358,13 +357,15 @@ private fun GeneratorScreen(onDiagnostics: () -> Unit) {
     var symbols by remember { mutableStateOf(initial.symbols) }
     var autoClearOn by remember { mutableStateOf(initial.clearOn) }
     var autoClearSecondsText by remember { mutableStateOf(initial.clearSeconds.toString()) }
+    var keepGeneratedValue by remember { mutableStateOf(initial.keepGeneratedValue) }
 
     LaunchedEffect(Unit) {
         snapshotFlow { length }.collect { lengthText = it.toString() }
     }
 
-    // Persist any change. Settings hold no secrets, only generation shape.
-    DisposableEffect(length, lowers, uppers, digits, symbols, autoClearOn, autoClearSecondsText) {
+    // Persist any change. Settings hold no secrets, only generation shape and
+    // the keep-value preference (a boolean, not a password).
+    DisposableEffect(length, lowers, uppers, digits, symbols, autoClearOn, autoClearSecondsText, keepGeneratedValue) {
         Settings.save(
             context,
             Settings.Snapshot(
@@ -375,6 +376,7 @@ private fun GeneratorScreen(onDiagnostics: () -> Unit) {
                 symbols = symbols,
                 clearOn = autoClearOn,
                 clearSeconds = autoClearSecondsText.toIntOrNull()?.takeIf { it > 0 } ?: 30,
+                keepGeneratedValue = keepGeneratedValue,
             ),
         )
         onDispose {}
@@ -497,53 +499,38 @@ private fun GeneratorScreen(onDiagnostics: () -> Unit) {
             )
         }
 
+        // §5.1: "keep generated value" drives §2 receipts. Default off. Must be
+        // armed BEFORE generating — the value is wiped immediately after delivery.
+        ToggleRow("Save generated passwords to receipts (so you can recover them)", keepGeneratedValue) {
+            keepGeneratedValue = it
+        }
+        Text(
+            if (keepGeneratedValue)
+                "Receipts will store the password value so you can recover a signup you did through passgen."
+            else
+                "Off = receipts record only when/where a password was generated, not the value.",
+            color = Color(0xFF707070),
+            fontSize = 11.sp,
+        )
+
         Spacer(Modifier.height(12.dp))
 
         Text(
-            "Recommended:  Autofill",
+            "Autofill",
             color = Color(0xFFE0E0E0),
             fontSize = 16.sp,
         )
 
-        if (DeviceProfile.isSamsung()) {
-            // Samsung exposes a primary + additional autofill slot pair. Best
-            // practice is: keep your existing password manager (Samsung Pass,
-            // Bitwarden, 1Password, Google) in the primary slot, add passgen
-            // as the additional service. Both respond when you focus a field,
-            // so passgen's "generate" suggestion appears alongside your
-            // existing manager's saved entries.
+        // §7.1: status-first. Lead with who holds the slot, not a "set passgen
+        // as provider" CTA. hasEnabledAutofillServices() is true only when WE
+        // hold it; Android's API only distinguishes "us or not us", so we never
+        // claim to name the incumbent beyond "another provider".
+        if (autofillEnabled) {
             Text(
-                "Samsung mode:  keep your existing password manager (Samsung Pass / Bitwarden / Google) in the Primary slot. Add passgen in the Additional slot. Both will respond to password fields — your saved entries plus passgen's 'generate' option.",
+                "Autofill: passgen is the active provider.",
                 color = Color(0xFF9E9E9E),
                 fontSize = 12.sp,
             )
-            SecureOutlinedButton(
-                onClick = {
-                    runCatching {
-                        // Samsung's autofill page lives under General Management.
-                        // The standard ACTION_SETTINGS reliably lands there; the
-                        // ACTION_REQUEST_SET_AUTOFILL_SERVICE intent only
-                        // controls the Primary slot, which is the wrong slot
-                        // for our coexistence flow.
-                        val intent = Intent("android.settings.AUTOFILL_SETTINGS")
-                        context.startActivity(intent)
-                    }.onFailure {
-                        runCatching {
-                            context.startActivity(Intent(AndroidSettings.ACTION_SETTINGS))
-                        }
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Open autofill settings → use 'Additional service' slot")
-            }
-            Text(
-                "    Path:  Settings → General management → Passwords, autofill and personal data → Autofill service → tap 'Additional service' → pick passgen.",
-                color = Color(0xFF707070),
-                fontSize = 11.sp,
-            )
-            // Provide an escape hatch for users who want passgen as the only
-            // autofill provider after all (uninstalled their old manager, etc.).
             SecureOutlinedButton(
                 onClick = {
                     runCatching {
@@ -555,53 +542,52 @@ private fun GeneratorScreen(onDiagnostics: () -> Unit) {
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(if (autofillEnabled) "Autofill primary = passgen — change" else "Or: set passgen as PRIMARY (replaces existing)")
+                Text("Change autofill provider")
             }
         } else {
-            // Stock Android / Pixel / OnePlus / Xiaomi / etc.: ONE autofill
-            // provider at a time. The user has to choose between (a) replacing
-            // their existing manager with passgen as the active autofill, or
-            // (b) using passgen via the IME path or Credential Manager
-            // (Android 14+) to coexist with their existing manager.
+            // §7.3: the Samsung dual-slot "Additional service" flow ships ONLY
+            // behind a verified capability check. Until verified on-device it
+            // returns false and we fall through to the always-true keyboard path.
             Text(
-                "Standard mode:  Android lets only one autofill provider be active at a time. To coexist with your existing password manager (Bitwarden, 1Password, Google), use Credential Manager (Android 14+) or the Custom keyboard mode below — neither competes for the autofill slot.",
+                "Autofill: another provider holds the slot (likely your password manager). passgen is available in keyboard mode — no slot needed. Enable the passgen keyboard below.",
                 color = Color(0xFF9E9E9E),
                 fontSize = 12.sp,
             )
+            if (supportsVerifiedDualAutofillSlots()) {
+                Text(
+                    "On this device you can also add passgen as an Additional autofill service alongside your existing manager.",
+                    color = Color(0xFF9E9E9E),
+                    fontSize = 12.sp,
+                )
+            }
+            // Secondary, clearly-labeled — never the primary action.
             SecureOutlinedButton(
                 onClick = {
+                    // Only the documented intent that controls the primary slot;
+                    // no undocumented "android.settings.AUTOFILL_SETTINGS" and no
+                    // generic-Settings fallback that strands the user (§7.3.3).
                     runCatching {
                         val intent = Intent(AndroidSettings.ACTION_REQUEST_SET_AUTOFILL_SERVICE).apply {
                             data = Uri.parse("package:" + context.packageName)
                         }
                         context.startActivity(intent)
-                    }.onFailure {
-                        runCatching {
-                            context.startActivity(Intent(AndroidSettings.ACTION_SETTINGS))
-                        }
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(if (autofillEnabled) "Autofill enabled — change provider" else "Set passgen as autofill provider")
+                Text("Replace current autofill provider with passgen")
             }
-
-            Text(
-                "    Note: Android's Credential Manager API isn't a fit here — it's designed for storage providers (Google / Bitwarden) acknowledging passwords the app already chose. There's no standard 'ask provider to generate' flow. The Custom keyboard mode below is the universal coexistence path.",
-                color = Color(0xFF707070),
-                fontSize = 11.sp,
-            )
         }
 
         Spacer(Modifier.height(16.dp))
 
         Text(
-            "Vault:  encrypted local password database",
+            "Ledger:  import → review → hand off",
             color = Color(0xFFE0E0E0),
             fontSize = 16.sp,
         )
         Text(
-            "Argon2id + AES-256-GCM + Android Keystore device-binding. The vault self-generates a 256-bit master key at first run, self-encrypts it under your device's screen-lock-bound Keystore key, and never displays it. Unlock and per-entry reveal both require device biometric / PIN. No typed master, no typed reveal-lock.",
+            "A local encrypted ledger that sits beside Bitwarden: import your passwords (Google, Proton, Bitwarden), keep a receipt of every password passgen generates, and hand off to Bitwarden any time via encrypted or plaintext export. Argon2id + AES-256-GCM + Android Keystore device-binding. The master key is never displayed; unlock requires device biometric / PIN.",
             color = Color(0xFF9E9E9E),
             fontSize = 12.sp,
         )
@@ -613,18 +599,18 @@ private fun GeneratorScreen(onDiagnostics: () -> Unit) {
             },
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text("Open vault")
+            Text("Open ledger")
         }
 
         Spacer(Modifier.height(16.dp))
 
         Text(
-            "Alternative:  Custom keyboard",
+            "Recommended:  passgen keyboard",
             color = Color(0xFFE0E0E0),
             fontSize = 16.sp,
         )
         Text(
-            "Strongest path. Switch to passgen as your keyboard on a password field, tap Generate, the password is typed directly into the field. Bypasses clipboard AND autofill IPC. Works in apps that block autofill.",
+            "The coexistence path — no autofill slot needed. Switch to passgen as your keyboard on a password field: Generate a new password, or Type a saved entry from your ledger. The value is typed directly into the field, bypassing clipboard AND autofill IPC. Works in apps that block autofill and works whether or not Bitwarden holds autofill.",
             color = Color(0xFF9E9E9E),
             fontSize = 12.sp,
         )
@@ -655,6 +641,12 @@ private fun GeneratorScreen(onDiagnostics: () -> Unit) {
                 fontSize = 11.sp,
             )
         }
+        // §6.4: honest known-limitation, not a silent gap.
+        Text(
+            "The passgen keyboard opts out of accessibility services by design (it won't be read by TalkBack or other screen readers). Screen-reader users should use autofill or clipboard mode.",
+            color = Color(0xFF707070),
+            fontSize = 11.sp,
+        )
 
         Spacer(Modifier.height(16.dp))
 
@@ -686,18 +678,29 @@ private fun GeneratorScreen(onDiagnostics: () -> Unit) {
                     digits = digits,
                     symbols = symbols,
                 )
+                val snap = Settings.load(context)
                 val chars = PasswordGenerator.generate(opts)
                 try {
                     val seconds = if (autoClearOn) {
                         autoClearSecondsText.toIntOrNull()?.takeIf { it > 0 } ?: 30
                     } else null
                     Clipboard.copySensitive(context, chars, seconds)
+                    // §2.2: write a receipt for the clipboard generate path.
+                    // Clipboard has no target field — targetKind="unknown".
+                    runCatching {
+                        Receipts.append(
+                            context.applicationContext, "clipboard", "", "unknown", snap,
+                            if (snap.keepGeneratedValue) chars else null,
+                        )
+                    }
+                    // §5.2: honest auto-clear copy — the clear is a process-scoped
+                    // Handler, so promise it only while passgen runs.
                     val msg = if (seconds != null) {
-                        "Copied ($length chars). Auto-clear in ${seconds}s."
+                        "Copied ($length chars). Auto-clears in ${seconds}s while passgen is running — if you swipe passgen away first, clear your clipboard manually."
                     } else {
                         "Copied ($length chars)."
                     }
-                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                 } finally {
                     PasswordGenerator.wipe(chars)
                 }
@@ -760,6 +763,22 @@ private fun isPassgenImeEnabled(
         it.packageName == ctx.packageName
     }
 }
+
+/**
+ * §7.3: whether this device's system settings expose a verified "Additional
+ * service" autofill slot that can hold passgen ALONGSIDE the incumbent.
+ *
+ * The dual-slot instructions were unverified on real One UI 7 (SM-S948U;
+ * SAMSUNG_QUIRKS.md has no autofill entry). Rather than assert a settings path
+ * that may not exist, this returns false until an on-device verification lands
+ * (an operator action tracked in SAMSUNG_QUIRKS.md). Returning false makes the
+ * UI fall through to the always-true keyboard-mode path — the safe channel —
+ * instead of stranding the user with instructions that may be wrong.
+ *
+ * Kept as a function (not a hardcoded false) so flipping it after verification
+ * is a one-line change with the capability check in one place.
+ */
+private fun supportsVerifiedDualAutofillSlots(): Boolean = false
 
 @Composable
 private fun ToggleRow(label: String, value: Boolean, onChange: (Boolean) -> Unit) {

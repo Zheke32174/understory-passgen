@@ -30,13 +30,8 @@ import java.util.UUID
  *
  * The plaintext JSON has:
  *   {
- *     "reveal_lock_hash": "argon2id-base64(reveal_lock_password, salt2)",
- *     "reveal_lock_salt": "base64",
- *     "entries": [ { id, title, username, password, url, notes, created, updated } ],
+ *     "entries": [ { id, title, username, password, url, notes, created, updated, source } ],
  *   }
- *
- * The reveal-lock password is verified by re-deriving Argon2id and comparing.
- * It is NEVER used to derive the vault key.
  */
 data class VaultEntry(
     val id: String,
@@ -47,6 +42,9 @@ data class VaultEntry(
     val notes: String,
     val created: Long,
     val updated: Long,
+    // Provenance of the entry: "" (manual), "import:bitwarden", "import:google",
+    // "receipt", … Backwards-compatible: optional in fromJson, defaulted.
+    val source: String = "",
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("id", id)
@@ -57,6 +55,7 @@ data class VaultEntry(
         put("notes", notes)
         put("created", created)
         put("updated", updated)
+        if (source.isNotEmpty()) put("source", source)
     }
 
     companion object {
@@ -69,6 +68,7 @@ data class VaultEntry(
             notes = o.optString("notes", ""),
             created = o.optLong("created", System.currentTimeMillis()),
             updated = o.optLong("updated", System.currentTimeMillis()),
+            source = o.optString("source", ""),
         )
     }
 }
@@ -87,10 +87,7 @@ object Vault {
     //       bound Keystore key. No typed master; unlock = BiometricPrompt
     //       (biometric or device PIN). The "master password" in the user's
     //       sense is the wrapped KEK — never displayed.
-    private const val VERSION_V1: Byte = 1
     private const val VERSION_V2: Byte = 2
-    private const val CURRENT_VERSION: Byte = VERSION_V2
-    const val MIN_REVEAL_LOCK_LEN = 4
 
     /** Default master KEK size. 32 bytes = AES-256. */
     const val MASTER_KEK_BYTES = 32
@@ -103,13 +100,6 @@ object Vault {
      * carrying to a restored vault on a new device).
      */
     const val MASTER_ENTRY_TITLE = "passgen vault master"
-
-    // Reveal-lock Argon2 cost. Vault is already unlocked when this is checked
-    // — reveal-lock is a UX gate for the show-toggle, not a key derivation.
-    // Full vault-grade params (64 MiB / 3 iter) caused ~200 ms+ per show.
-    private const val REVEAL_M = 16 * 1024  // 16 MiB
-    private const val REVEAL_T = 2
-    private const val REVEAL_P = 1
 
     /**
      * Atomic file-replace. On Android filesystems (ext4 / f2fs) the

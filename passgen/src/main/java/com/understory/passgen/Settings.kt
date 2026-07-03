@@ -19,6 +19,7 @@ object Settings {
     private const val K_SYMBOLS = "symbols"
     private const val K_CLEAR_ON = "clear_on"
     private const val K_CLEAR_SECS = "clear_secs"
+    private const val K_KEEP_VALUE = "keep_generated_value"
 
     data class Snapshot(
         val length: Int,
@@ -28,6 +29,10 @@ object Settings {
         val symbols: Boolean,
         val clearOn: Boolean,
         val clearSeconds: Int,
+        // Drives §2 receipts. Default false (privacy-preserving): a receipt still
+        // records when/where/shape, but stores no password value unless armed.
+        // Must be armed BEFORE generating — the value is wiped after delivery.
+        val keepGeneratedValue: Boolean = false,
     )
 
     fun load(ctx: Context): Snapshot {
@@ -40,6 +45,7 @@ object Settings {
             symbols = p.getBoolean(K_SYMBOLS, true),
             clearOn = p.getBoolean(K_CLEAR_ON, true),
             clearSeconds = p.getInt(K_CLEAR_SECS, 30).coerceAtLeast(1),
+            keepGeneratedValue = p.getBoolean(K_KEEP_VALUE, false),
         )
     }
 
@@ -52,6 +58,7 @@ object Settings {
             .putBoolean(K_SYMBOLS, s.symbols)
             .putBoolean(K_CLEAR_ON, s.clearOn)
             .putInt(K_CLEAR_SECS, s.clearSeconds)
+            .putBoolean(K_KEEP_VALUE, s.keepGeneratedValue)
             .apply()
     }
 

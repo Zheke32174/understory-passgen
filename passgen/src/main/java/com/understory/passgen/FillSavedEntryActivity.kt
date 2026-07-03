@@ -15,7 +15,6 @@ import androidx.activity.compose.setContent
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,6 +45,7 @@ import androidx.fragment.app.FragmentActivity
 import com.understory.security.Crypto
 import com.understory.security.Diagnostics
 import com.understory.security.Tamper
+import com.understory.security.secureClickable
 
 /**
  * Saved-entry autofill flow.
@@ -165,7 +165,11 @@ class FillSavedEntryActivity : FragmentActivity() {
                 webDomain = webDomain,
                 appPackage = appPackage,
                 onPick = { entry ->
+                    // §5.3: lock the vault as soon as we've captured the entry to
+                    // fill — previously only the cancel path locked, leaving the
+                    // KEK live after a successful pick.
                     onFilled(entry)
+                    s.vault.lock()
                     // Don't reset state; activity finishes via returnDataset.
                 },
                 onCancel = {
@@ -292,7 +296,9 @@ class FillSavedEntryActivity : FragmentActivity() {
         // permissive — partial matches surface to the top with a small
         // visual marker; everything else is shown below so the user can
         // still pick across-account entries.
-        val all = vault.contents.entries
+        // §10.1: the master-KEK entry is infrastructure, never a fillable
+        // credential — filter it out of the pickable list.
+        val all = vault.contents.entries.filter { it.title != Vault.MASTER_ENTRY_TITLE }
         val matched = remember(webDomain, appPackage, all.size) {
             all.filter { entryMatches(it, webDomain, appPackage) }
         }
@@ -363,7 +369,7 @@ class FillSavedEntryActivity : FragmentActivity() {
         Box(
             modifier = Modifier.fillMaxWidth()
                 .background(Color(0xFF1C1C1C), RoundedCornerShape(6.dp))
-                .clickable { onPick(entry) }
+                .secureClickable { onPick(entry) }
                 .padding(12.dp),
         ) {
             Column {

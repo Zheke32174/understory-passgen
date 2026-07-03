@@ -47,7 +47,7 @@ object ImportFormats {
 
     /** Detect the file format from contents. Header sniffing only — never
      *  reads beyond the first few KB. */
-    enum class Format { GOOGLE_CSV, PROTON_PASS_JSON, PROTON_PASS_CSV, UNKNOWN }
+    enum class Format { GOOGLE_CSV, PROTON_PASS_JSON, PROTON_PASS_CSV, BITWARDEN_JSON, BITWARDEN_CSV, UNKNOWN }
 
     fun detect(sample: String): Format {
         val trimmed = sample.trimStart()
@@ -60,6 +60,14 @@ object ImportFormats {
                     trimmed.contains("\"protonPass\""))) {
                 return Format.PROTON_PASS_JSON
             }
+            // Bitwarden JSON: an "items" array whose elements carry "type" and a
+            // "login" object. Check both tokens so an unrelated JSON with an
+            // "items" array doesn't false-match.
+            if (trimmed.contains("\"items\"") &&
+                trimmed.contains("\"login\"") &&
+                trimmed.contains("\"type\"")) {
+                return Format.BITWARDEN_JSON
+            }
             return Format.UNKNOWN
         }
         // CSV path: peek at the header row.
@@ -67,6 +75,8 @@ object ImportFormats {
         return when {
             firstLine.startsWith("name,url,username,password,note") -> Format.GOOGLE_CSV
             firstLine.startsWith("type,name,url,username,password,note,totp") -> Format.PROTON_PASS_CSV
+            // Bitwarden's CSV export header begins folder,favorite,type,name,notes,fields,
+            firstLine.startsWith("folder,favorite,type,name,notes,fields,") -> Format.BITWARDEN_CSV
             else -> Format.UNKNOWN
         }
     }
@@ -155,6 +165,71 @@ object ImportFormats {
     }
 
     /**
+     * Parse a Bitwarden CSV export. Header:
+     * folder,favorite,type,name,notes,fields,reprompt,login_uri,
+     * login_username,login_password,login_totp. Only `type=login` rows import
+     * (Bitwarden type 2=note, 3=card, 4=identity in CSV are labelled "note",
+     * "card", "identity").
+     */
+    fun parseBitwardenCsv(text: String): List<ImportedPassword> {
+        val rows = parseCsv(text)
+        if (rows.isEmpty()) return emptyList()
+        val header = rows.first().map { it.trim().lowercase() }
+        val ix = headerIndex(
+            header,
+            listOf("type", "name", "notes", "login_uri", "login_username", "login_password"),
+        )
+        val out = mutableListOf<ImportedPassword>()
+        for (row in rows.drop(1)) {
+            if (row.all { it.isEmpty() }) continue
+            val rowType = row.getOr(ix["type"]).trim().lowercase()
+            if (rowType.isNotEmpty() && rowType != "login") continue
+            out += ImportedPassword(
+                title = row.getOr(ix["name"]),
+                url = row.getOr(ix["login_uri"]),
+                username = row.getOr(ix["login_username"]),
+                password = row.getOr(ix["login_password"]),
+                notes = row.getOr(ix["notes"]),
+            )
+        }
+        return out
+    }
+
+    /**
+     * Parse a Bitwarden JSON export ("File format: .json"). Iterate `items[]`,
+     * keep `type==1` (login), read login.username / login.password / first of
+     * login.uris[].uri, plus name and notes.
+     */
+    fun parseBitwardenJson(text: String): List<ImportedPassword> {
+        val root = JSONObject(text)
+        if (root.optBoolean("encrypted", false)) {
+            throw IllegalArgumentException(
+                "Bitwarden export is encrypted; export with 'Password protected' turned OFF instead."
+            )
+        }
+        val items = root.optJSONArray("items") ?: return emptyList()
+        val out = mutableListOf<ImportedPassword>()
+        for (i in 0 until items.length()) {
+            val item = items.optJSONObject(i) ?: continue
+            // Bitwarden item type 1 = login. Ignore notes(2)/card(3)/identity(4).
+            if (item.optInt("type", 0) != 1) continue
+            val login = item.optJSONObject("login") ?: continue
+            val uris = login.optJSONArray("uris")
+            val firstUrl = if (uris != null && uris.length() > 0) {
+                uris.optJSONObject(0)?.optString("uri").orEmpty()
+            } else ""
+            out += ImportedPassword(
+                title = item.optString("name"),
+                username = login.optString("username"),
+                password = login.optString("password"),
+                url = firstUrl,
+                notes = item.optString("notes"),
+            )
+        }
+        return out
+    }
+
+    /**
      * Convenience entry point: detect format from the first chunk and dispatch.
      * Throws IllegalArgumentException with a human-readable reason if the
      * format isn't recognised.
@@ -165,11 +240,15 @@ object ImportFormats {
             Format.GOOGLE_CSV -> parseGooglePasswordsCsv(text)
             Format.PROTON_PASS_CSV -> parseProtonPassCsv(text)
             Format.PROTON_PASS_JSON -> parseProtonPassJson(text)
+            Format.BITWARDEN_CSV -> parseBitwardenCsv(text)
+            Format.BITWARDEN_JSON -> parseBitwardenJson(text)
             Format.UNKNOWN -> throw IllegalArgumentException(
                 "Unrecognised file. Expected Google Password Manager CSV " +
                     "(name,url,username,password,note), Proton Pass CSV " +
                     "(type,name,url,username,password,note,totp,...), " +
-                    "or Proton Pass unencrypted JSON."
+                    "Proton Pass unencrypted JSON, Bitwarden CSV " +
+                    "(folder,favorite,type,name,notes,fields,...), " +
+                    "or Bitwarden unencrypted JSON."
             )
         }
     }
