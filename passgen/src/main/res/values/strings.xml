@@ -64,4 +64,44 @@
     <!-- Vault activity fatal surface -->
     <string name="title_vault_crash">Ledger couldn\'t open</string>
     <string name="msg_vault_crash">The ledger hit an unexpected error while opening. Your stored entries are unchanged. Details below.</string>
+
+    <!-- Bottom navigation -->
+    <string name="nav_generate">Generate</string>
+    <string name="nav_ledger">Ledger</string>
+    <string name="nav_receipts">Receipts</string>
+    <string name="cd_nav_generate">Generate a password</string>
+    <string name="cd_nav_ledger">Open the ledger</string>
+    <string name="cd_nav_receipts">Generated-password receipts</string>
+
+    <!-- Generate screen structure -->
+    <string name="card_recipe_title">Password recipe</string>
+    <string name="card_recipe_desc">Length and character sets for every password you generate.</string>
+    <string name="label_character_sets">Character sets</string>
+    <string name="card_delivery_title">Deliver the password</string>
+    <string name="card_delivery_desc">Pick how the value reaches the field. The password never appears on screen.</string>
+    <string name="msg_security_line">On-screen capture blocked · no network permission · value never shown</string>
+
+    <!-- Ledger landing (nav destination) -->
+    <string name="ledger_landing_title">Encrypted ledger beside Bitwarden</string>
+    <string name="ledger_landing_body">A local, device-bound ledger: import from Google, Proton, or Bitwarden, keep a receipt of every password you generate, and hand off to Bitwarden any time via encrypted or plaintext export. Unlock needs your device biometric or PIN.</string>
+    <string name="ledger_feature_import">Import &amp; migrate</string>
+    <string name="ledger_feature_import_sub">Google, Proton, Bitwarden — parsed locally, nothing uploaded.</string>
+    <string name="ledger_feature_receipts">Never lose a generated password</string>
+    <string name="ledger_feature_receipts_sub">Every generate can leave a recoverable receipt.</string>
+    <string name="ledger_feature_handoff">Hand off to Bitwarden</string>
+    <string name="ledger_feature_handoff_sub">Encrypted .ukbackup or reviewed plaintext export.</string>
+    <string name="action_add_entry">Add entry</string>
+    <string name="cd_add_entry">Add a ledger entry</string>
+
+    <!-- Receipts landing (nav destination) -->
+    <string name="receipts_landing_title">Generated-password receipts</string>
+    <string name="receipts_landing_body">When you generate a password through the keyboard, autofill, or clipboard, a receipt lands in the ledger so you never lose a signup. Opening receipts unlocks the ledger with your device biometric or PIN.</string>
+    <string name="fmt_receipts_unclaimed">%1$d unclaimed receipt(s)</string>
+    <string name="receipts_unclaimed_sub">Open receipts to reveal, save to the ledger, or dismiss them.</string>
+    <string name="receipts_empty_title">No receipts waiting</string>
+    <string name="receipts_empty_body">When you generate a password with receipts on, a recoverable record appears here. Nothing is waiting right now — open receipts to review any you\'ve already handled.</string>
+    <string name="action_open_receipts">Open receipts</string>
+
+    <!-- Eng-only diagnostics affordance -->
+    <string name="cd_diagnostics">Diagnostics (engineering build)</string>
 </resources>

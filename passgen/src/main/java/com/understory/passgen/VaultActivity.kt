@@ -1,5 +1,6 @@
 package com.understory.passgen
 
+import com.understory.passgen.BuildConfig
 import com.understory.security.Crypto
 import com.understory.security.Diagnostics
 import com.understory.security.DiagnosticsScreen
@@ -87,6 +88,17 @@ class VaultActivity : FragmentActivity() {
          */
         const val EXTRA_PENDING_IMPORT_URI = "com.understory.passgen.EXTRA_PENDING_IMPORT_URI"
 
+        /**
+         * Optional Intent extra: a start-destination hint from the launcher's
+         * bottom-nav landing screens. After the normal unlock flow completes,
+         * the ledger opens directly on the requested sub-stage instead of the
+         * default List. Unlock is NEVER bypassed — this only chooses which
+         * post-unlock stage to land on. Unknown / absent = List.
+         */
+        const val EXTRA_START_DESTINATION = "com.understory.passgen.EXTRA_START_DESTINATION"
+        const val EXTRA_START_ADD = "add"
+        const val EXTRA_START_RECEIPTS = "receipts"
+
         /** Display name used in reset confirmation + honest copy. */
         const val APP_NAME = "Understory Keys"
     }
@@ -145,6 +157,7 @@ class VaultActivity : FragmentActivity() {
 
         @Suppress("DEPRECATION")
         val pendingImportUri: android.net.Uri? = intent?.getParcelableExtra(EXTRA_PENDING_IMPORT_URI)
+        val startDestination: String? = intent?.getStringExtra(EXTRA_START_DESTINATION)
 
         setContent {
             UnderstoryTheme(accent = UnderstoryAccent.PASSGEN) {
@@ -158,6 +171,7 @@ class VaultActivity : FragmentActivity() {
                         setUnlocked = { unlocked = it },
                         onClose = { finishAndRemoveTask() },
                         pendingImportUri = pendingImportUri,
+                        startDestination = startDestination,
                     )
                 }
             }
@@ -230,8 +244,21 @@ private fun VaultRoot(
     setUnlocked: (UnlockedVault?) -> Unit,
     onClose: () -> Unit,
     pendingImportUri: android.net.Uri? = null,
+    startDestination: String? = null,
 ) {
     val ctx = LocalContext.current
+    // Where to land AFTER unlock/setup completes. A pending import always wins
+    // (the user explicitly opened a file); otherwise the bottom-nav landing hint
+    // chooses Add or Receipts; default List. Unlock is never bypassed — this
+    // only selects the first post-unlock stage.
+    val postUnlockStage: () -> Stage = {
+        when {
+            pendingImportUri != null -> Stage.Import
+            startDestination == VaultActivity.EXTRA_START_ADD -> Stage.AddEntry
+            startDestination == VaultActivity.EXTRA_START_RECEIPTS -> Stage.Receipts
+            else -> Stage.List
+        }
+    }
     // Initial stage: if the vault file exists but the device-auth key was
     // destroyed by biometric re-enrollment / lock-screen change, the key state
     // is PERMANENTLY_INVALIDATED — route straight to Recovery instead of a
@@ -265,7 +292,7 @@ private fun VaultRoot(
             activity = activity,
             onCreated = { vault ->
                 setUnlocked(vault)
-                setStage(if (pendingImport != null) Stage.Import else Stage.List)
+                setStage(postUnlockStage())
             },
             onRestore = { setStage(Stage.Restore) },
             onClose = onClose,
@@ -274,7 +301,7 @@ private fun VaultRoot(
             activity = activity,
             onUnlocked = { vault ->
                 setUnlocked(vault)
-                setStage(if (pendingImport != null) Stage.Import else Stage.List)
+                setStage(postUnlockStage())
             },
             onRecovery = { recoveryKeyUsable = false; setStage(Stage.Recovery) },
             onClose = onClose,
@@ -732,8 +759,13 @@ private fun ListScreen(
         SecureOutlinedButton(onClick = onReset, modifier = Modifier.fillMaxWidth()) {
             Text("Reset ledger")
         }
-        OutlinedButton(onClick = onDiagnostics, modifier = Modifier.fillMaxWidth()) {
-            Text("Diagnostics")
+        // ENG-ONLY: the Diagnostics log surface never ships in prod. Gated on
+        // BuildConfig.FLAVOR == "eng"; in a prod build there is no button and no
+        // route into DiagnosticsScreen from the ledger.
+        if (BuildConfig.FLAVOR == "eng") {
+            OutlinedButton(onClick = onDiagnostics, modifier = Modifier.fillMaxWidth()) {
+                Text("Diagnostics")
+            }
         }
     }
 }
