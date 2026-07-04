@@ -22,5 +22,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "passgen"
 include(":common-security")
+include(":elevation")
 include(":common-backup")
 include(":passgen")
