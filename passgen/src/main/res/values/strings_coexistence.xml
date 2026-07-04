@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Strings for the "Coexistence truth" read-only surface (CoexistenceScreen.kt /
+    CoexistenceTruth.kt). Kept in a feature-scoped file so the shared strings.xml
+    is not touched. READ-ONLY feature: no action here writes any setting.
+-->
+<resources>
+    <!-- Entry point / screen chrome -->
+    <string name="coex_title">Coexistence truth</string>
+    <string name="coex_entry_label">Who holds each slot?</string>
+    <string name="coex_entry_sub">See the real autofill / keyboard / accessibility holders</string>
+    <string name="coex_intro">A read-only look at who actually holds the autofill slot, which keyboard is active, and which accessibility services are live. Nothing here changes any setting.</string>
+
+    <!-- Elevated named-truth card -->
+    <string name="coex_reading">Reading current settings…</string>
+    <string name="coex_named_header">Named holders (elevated read)</string>
+    <string name="coex_slot_autofill">Autofill provider</string>
+    <string name="coex_slot_ime">Active keyboard</string>
+    <string name="coex_slot_a11y">Accessibility services</string>
+    <string name="coex_slot_line">%1$s: %2$s</string>
+
+    <string name="coex_holder_self">Understory Keys (passgen) holds it</string>
+    <string name="coex_holder_none">None set</string>
+    <string name="coex_holder_unparsed">%1$s (unrecognised format — shown as-is)</string>
+
+    <!-- Accessibility service list -->
+    <string name="coex_a11y_none">No accessibility services are enabled.</string>
+    <string name="coex_a11y_thirdparty_warn">%1$d third-party accessibility service(s) can read on-screen text and inject taps — the real scrape risk.</string>
+    <string name="coex_a11y_item_thirdparty">⚠  %1$s (third-party)</string>
+    <string name="coex_a11y_item_system">%1$s (system)</string>
+    <string name="coex_action_review_a11y">Review accessibility services</string>
+    <string name="coex_readonly_note">Read-only. This screen reads settings; it never changes them.</string>
+
+    <!-- Rootless heuristic fallback (no elevation) -->
+    <string name="coex_heuristic_header">Coexistence (rootless view)</string>
+    <string name="coex_heuristic_autofill_us">Autofill: passgen is the active provider.</string>
+    <string name="coex_heuristic_autofill_other">Autofill: another provider holds the slot (likely your password manager). Without elevation, Android only tells passgen "us or not us" — not who the other provider is.</string>
+    <string name="coex_heuristic_ime_us">Keyboard: the passgen keyboard is enabled.</string>
+    <string name="coex_heuristic_ime_other">Keyboard: the passgen keyboard is not enabled; another keyboard is active.</string>
+    <string name="coex_heuristic_note">Grant Shizuku below to see the actual named holders and which accessibility services are live.</string>
+
+    <!-- ElevationCard copy -->
+    <string name="coex_unlock_autofill">Name the actual autofill provider (not just "us / not us")</string>
+    <string name="coex_unlock_ime">Name the active keyboard</string>
+    <string name="coex_unlock_a11y">List live accessibility services and flag third-party scrape risks</string>
+    <string name="coex_rootless_fallback">Open Accessibility settings to review which services can read your screen.</string>
+</resources>

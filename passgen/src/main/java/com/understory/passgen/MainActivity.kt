@@ -376,6 +376,18 @@ private fun PassgenApp() {
         return
     }
 
+    // Coexistence-truth sub-route (SHIPPING, not eng-gated): a small read-only
+    // screen reachable from the Generate tab's delivery section. When elevated it
+    // names the actual autofill / IME / a11y holders; rootless it keeps the
+    // AutofillManager heuristic + a Shizuku grant invite. Read-only, no writes.
+    var showCoexistence by rememberSaveable { mutableStateOf(false) }
+
+    if (showCoexistence) {
+        BackHandler { showCoexistence = false }
+        CoexistenceScreen(onBack = { showCoexistence = false })
+        return
+    }
+
     // Back at a top-level tab: minimize under TestingMode.KEEP_ALIVE_ON_LEAVE so
     // the tester can switch apps and return. No-op for release.
     KeepAliveBackHandler("passgen.App")
@@ -426,7 +438,10 @@ private fun PassgenApp() {
         },
     ) { pad ->
         when (tab) {
-            PassgenTab.Generate -> GenerateTab(Modifier.padding(pad))
+            PassgenTab.Generate -> GenerateTab(
+                modifier = Modifier.padding(pad),
+                onOpenCoexistence = { showCoexistence = true },
+            )
             PassgenTab.Ledger -> LedgerTab(Modifier.padding(pad))
             PassgenTab.Receipts -> ReceiptsTab(Modifier.padding(pad))
         }
@@ -434,7 +449,10 @@ private fun PassgenApp() {
 }
 
 @Composable
-private fun GenerateTab(modifier: Modifier = Modifier) {
+private fun GenerateTab(
+    modifier: Modifier = Modifier,
+    onOpenCoexistence: () -> Unit = {},
+) {
     val context = LocalContext.current
     val initial = remember { Settings.load(context) }
 
@@ -821,6 +839,22 @@ private fun GenerateTab(modifier: Modifier = Modifier) {
                 stringResource(R.string.msg_keyboard_a11y_note),
                 style = MaterialTheme.typography.bodySmall,
                 color = UnderstoryTheme.semantic.dim,
+            )
+        }
+
+        // Coexistence-truth entry: a read-only look at who actually holds the
+        // autofill / keyboard / accessibility slots. Rootless it shows the
+        // AutofillManager heuristic + a Shizuku grant invite; elevated it names
+        // the real holders. Whole-card tap navigates to CoexistenceScreen.
+        SuiteCard(onClick = onOpenCoexistence) {
+            Text(
+                stringResource(R.string.coex_entry_label),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                stringResource(R.string.coex_entry_sub),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
