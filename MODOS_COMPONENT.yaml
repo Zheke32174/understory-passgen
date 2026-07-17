@@ -1,0 +1,33 @@
+apiVersion: modos.pleiades/v1alpha1
+kind: Component
+metadata:
+  name: understory-password-generator
+  repository: Zheke32174/understory-passgen
+  visibility: public
+  lifecycle: operational
+  defaultBranch: main
+spec:
+  roles:
+    - local-password-generator
+    - credential-policy-helper
+    - entropy-consumer
+  authority: none
+  inputs:
+    - user-selected-password-policy
+    - local-cryptographic-randomness
+  outputs:
+    - generated-passwords
+    - non-secret-strength-metadata
+  capabilitiesProvided:
+    - credential.generate.local
+    - credential.policy.evaluate
+  capabilitiesRequired:
+    - entropy.secure.local
+    - identity.user.local
+  dataClasses:
+    - public
+    - private
+    - secret
+  failurePolicy: fail-closed
+  promotionPolicy: signed-pr
+  notes: Generated secrets remain local and are never written to telemetry, logs, model context, or shared memory by the component contract.
