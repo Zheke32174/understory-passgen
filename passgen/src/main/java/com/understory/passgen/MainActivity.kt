@@ -267,7 +267,7 @@ class MainActivity : ComponentActivity() {
             appendLine("Cert digest (this install):")
             appendLine(sigDigest)
             appendLine("Cert digest (expected):")
-            appendLine(SuitePins.EXPECTED_CERT_SHA256)
+            appendLine(SuitePins.EXPECTED_RELEASE_CERT_SHA256)
             if (stack != null) {
                 appendLine()
                 appendLine("Stack trace:")
