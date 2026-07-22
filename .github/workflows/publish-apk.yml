@@ -1,39 +1,54 @@
-name: Repair retired signing-pin consumer
+name: Android validation — no publication
 
 on:
   pull_request:
+  push:
     branches: [main, master]
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: android-validation-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  repair:
-    if: github.head_ref == 'security/public-signing-containment-v1'
+  build-test:
     runs-on: ubuntu-24.04
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: security/public-signing-containment-v1
-          fetch-depth: 1
+          persist-credentials: false
           show-progress: false
-      - name: Replace retired diagnostic pin reference
+      - uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92
+        with:
+          gradle-version: '8.10.2'
+          cache-provider: basic
+      - name: Validate public signing boundary
+        run: python ci/validate-public-signing-boundary.py
+      - name: Install Android SDK components
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-35" "build-tools;35.0.0" > /dev/null
+      - name: Assemble local debug APK
+        shell: bash
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          path = Path('passgen/src/main/java/com/understory/passgen/MainActivity.kt')
-          text = path.read_text()
-          old = 'SuitePins.EXPECTED_CERT_SHA256'
-          if text.count(old) != 1:
-              raise SystemExit(f'expected one retired pin reference, found {text.count(old)}')
-          path.write_text(text.replace(old, 'SuitePins.EXPECTED_RELEASE_CERT_SHA256'))
-          PY
-          git diff --check
-      - name: Commit source repair
+          set -o pipefail
+          if ! gradle --no-daemon assembleDebug --console=plain > assemble.log 2>&1; then
+            tail -n 250 assemble.log
+            exit 1
+          fi
+          tail -n 80 assemble.log
+      - name: Run unit tests with bounded failure receipt
+        shell: bash
         run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add passgen/src/main/java/com/understory/passgen/MainActivity.kt
-          git commit -m "Use release identity in diagnostic output"
-          git push origin HEAD:security/public-signing-containment-v1
+          set -o pipefail
+          if ! gradle --no-daemon test --console=plain > unit-test.log 2>&1; then
+            tail -n 250 unit-test.log
+            exit 1
+          fi
+          tail -n 80 unit-test.log
