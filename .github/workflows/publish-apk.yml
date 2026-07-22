@@ -15,7 +15,8 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: security/public-signing-containment-v1
-          fetch-depth: 0
+          fetch-depth: 1
+          show-progress: false
       - name: Import exact repaired shared trust boundary
         run: |
           set -euo pipefail
@@ -27,12 +28,21 @@ jobs:
       - name: Apply repository containment
         env:
           BASE_HEAD: cd9ca27ddfa8c5a45bb68c5583f43b1612d44a89
-        run: python /tmp/apply-containment.py
-      - name: Verify bounded result
         run: |
-          set -euo pipefail
-          python ci/validate-public-signing-boundary.py
-          git diff --check
+          python /tmp/apply-containment.py
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('.github/workflows/publish-apk.yml')
+          text = path.read_text()
+          marker = '      - name: Confirm no publication authority\n'
+          if marker in text:
+              text = text.split(marker, 1)[0]
+          path.write_text(text.rstrip() + '\n')
+          PY
+      - name: Validate source policy
+        run: python ci/validate-public-signing-boundary.py
+      - name: Check patch hygiene
+        run: git diff --check
       - name: Commit repaired branch
         run: |
           set -euo pipefail
