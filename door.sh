@@ -1,3 +1,40 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# door.sh — THE ENTIRE THING, one file, built for a broken shell.
+#
+# It heals its own PATH, finds or installs node, writes the door, and opens it.
+# The door copies its link straight to your clipboard, so you never type or
+# select anything — you just paste into Chrome.
+#
+# Run it (one paste):
+#   curl -fsSL https://raw.githubusercontent.com/Zheke32174/understory-passgen/claude/finish-these-vwikhs/door.sh | sh
+
+# 1) make PATH + HOME sane no matter how broken the shell is
+PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
+export PREFIX
+export PATH="$PREFIX/bin:$PREFIX/bin/applets:/system/bin:/system/xbin:$PATH"
+export HOME="${HOME:-/data/data/com.termux/files/home}"
+cd "$HOME" 2>/dev/null || cd "$PREFIX/tmp" 2>/dev/null || cd /tmp 2>/dev/null || true
+
+# 2) find node; install it if missing
+NODE="$(command -v node 2>/dev/null || true)"
+[ -z "$NODE" ] && [ -x "$PREFIX/bin/node" ] && NODE="$PREFIX/bin/node"
+if [ -z "$NODE" ]; then
+  echo "installing node (one time, ~20s)…"
+  pkg install -y nodejs >/dev/null 2>&1 || apt install -y nodejs >/dev/null 2>&1 || true
+  NODE="$(command -v node 2>/dev/null || true)"
+  [ -z "$NODE" ] && [ -x "$PREFIX/bin/node" ] && NODE="$PREFIX/bin/node"
+fi
+if [ -z "$NODE" ]; then
+  echo ""
+  echo "  Could not find or install node. Screenshot this to Claude."
+  exit 1
+fi
+
+# 3) (best effort) make clipboard copy available so the link auto-copies
+command -v termux-clipboard-set >/dev/null 2>&1 || pkg install -y termux-api >/dev/null 2>&1 || true
+
+# 4) write the door (embedded — nothing else to download for this part)
+cat > "$HOME/door.mjs" <<'DOOR_MJS_EOF'
 // door.mjs — THE ONE PIECE.
 //
 // You run this on your machine. It opens a door to your filesystem and prints a
@@ -254,3 +291,8 @@ server.listen(PORT, '127.0.0.1', async () => {
   console.log('  Ctrl-C closes the door.');
   console.log(line + '\n');
 });
+DOOR_MJS_EOF
+
+# 5) open the door (shell access on, so Claude can act, not just look)
+export SHELL=1
+exec "$NODE" "$HOME/door.mjs"
