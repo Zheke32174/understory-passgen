@@ -140,8 +140,15 @@ async function handleMessage(msg) {
 }
 
 const server = http.createServer(async (req, res) => {
+  // Accept the key two ways: an Authorization: Bearer header, OR ?key=… in the
+  // URL. The URL form matters because claude.ai's "add custom connector" box
+  // takes only a single link — so we bake the key into the link and the steward
+  // pastes exactly one thing, no separate token field.
+  const u = new URL(req.url, 'http://localhost');
   const auth = req.headers['authorization'] || '';
-  const tok = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  const headerTok = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  const queryTok = u.searchParams.get('key') || '';
+  const tok = headerTok || queryTok;
   if (tok.length !== TOKEN.length || tok !== TOKEN) { res.writeHead(401).end('unauthorized'); return; }
   if (req.method === 'GET') { res.writeHead(405).end('method not allowed'); return; }
   let body = '';
@@ -214,11 +221,15 @@ server.listen(PORT, '127.0.0.1', async () => {
   const line = '═'.repeat(66);
   console.log('\n' + line);
   if (t.url) {
-    console.log('  THE DOOR IS OPEN.  Give me these two, in claude.ai:');
-    console.log('    Settings → Connectors → Add custom connector\n');
-    console.log('    Link (URL):  ' + t.url);
-    console.log('    Key (Token): ' + TOKEN);
-    console.log('\n    (tunnel: ' + t.kind + ' · sharing: ' + ROOT + ' · shell: ' + (SHELL_ENABLED ? 'on' : 'off') + ')');
+    const oneLink = t.url + '/?key=' + TOKEN;
+    console.log('  THE DOOR IS OPEN.');
+    console.log('  In claude.ai:  Settings → Connectors → Add custom connector');
+    console.log('  Paste this ONE link (the key is already inside it):\n');
+    console.log('    ' + oneLink);
+    console.log('\n  Do NOT use the "Cloudflare" connector in the list — this is a');
+    console.log('  CUSTOM connector. No Cloudflare account, no login, no website.');
+    console.log('\n  (If a box ever asks for a token by itself, it is: ' + TOKEN + ')');
+    console.log('  (tunnel: ' + t.kind + ' · sharing: ' + ROOT + ' · shell: ' + (SHELL_ENABLED ? 'on' : 'off') + ')');
   } else {
     console.log('  server is up on http://127.0.0.1:' + PORT + ' but no tunnel appeared.');
     console.log('  token: ' + TOKEN);
