@@ -1,10 +1,10 @@
 #!/data/data/com.termux/files/usr/bin/sh
 # door.sh — THE ENTIRE THING, one file, built for a broken shell.
 #
-# It heals its own PATH, finds or installs node, writes the door, and opens it.
-# The door copies its link straight to your clipboard, so you never type or
-# select anything — you just paste into Chrome. If an old door is still running,
-# the new one steps to the next free port automatically.
+# Heals its own PATH, finds/installs node, writes the door, opens it. The door
+# copies its link to your clipboard so you never type or select it. If an old
+# door holds the port, it steps to the next one. If Cloudflare's tunnel stalls,
+# it falls back to a second tunnel (localhost.run over ssh).
 #
 # Run it (one paste):
 #   curl -fsSL https://raw.githubusercontent.com/Zheke32174/understory-passgen/claude/finish-these-vwikhs/door.sh | sh
@@ -29,7 +29,9 @@ if [ -z "$NODE" ]; then
   exit 1
 fi
 
+# helpers for clipboard + the fallback tunnel (best effort, never fatal)
 command -v termux-clipboard-set >/dev/null 2>&1 || pkg install -y termux-api >/dev/null 2>&1 || true
+command -v ssh >/dev/null 2>&1 || pkg install -y openssh >/dev/null 2>&1 || true
 
 cat > "$HOME/door.mjs" <<'DOOR_MJS_EOF'
 // door.mjs — THE ONE PIECE.
@@ -55,7 +57,7 @@ cat > "$HOME/door.mjs" <<'DOOR_MJS_EOF'
 
 import http from 'node:http';
 import { readFile, readdir, stat, appendFile, mkdir } from 'node:fs/promises';
-import { createWriteStream, existsSync, writeFileSync } from 'node:fs';
+import { createWriteStream, existsSync, writeFileSync, statSync } from 'node:fs';
 import { resolve, relative, isAbsolute, dirname, join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
@@ -225,20 +227,45 @@ async function openTunnel() {
       p.kill();
     } catch {}
   }
-  // 2) cloudflared quick tunnel — fetch the binary if missing
+  // 2) cloudflared quick tunnel — REUSE the binary if we already fetched it
+  //    (re-downloading each run is slow on mobile and can corrupt a good copy).
   let cfd = findCmd('cloudflared');
   if (!cfd) {
     const a = arch() === 'arm64' ? 'arm64' : 'amd64';
     const os = platform() === 'darwin' ? 'darwin' : 'linux';
     const dest = join(tmpdir(), 'cloudflared-door');
-    process.stderr.write('fetching a tunnel (cloudflared) …\n');
-    cfd = await download(`https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-${os}-${a}`, dest);
+    let cached = false;
+    try { cached = existsSync(dest) && statSync(dest).size > 1_000_000; } catch { cached = false; }
+    if (cached) {
+      cfd = dest;
+    } else {
+      process.stderr.write('fetching a tunnel (cloudflared) …\n');
+      try { cfd = await download(`https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-${os}-${a}`, dest); }
+      catch { cfd = null; }
+    }
   }
-  const p = spawn(cfd, ['tunnel', '--url', `http://127.0.0.1:${PORT}`], { stdio: ['ignore', 'pipe', 'pipe'] });
   // The real quick-tunnel host is multi-word + hyphenated (e.g. blue-cat-run-9.trycloudflare.com).
   // Require at least one hyphen so we never grab cloudflared's own api.trycloudflare.com line.
-  const url = await waitForUrl(p, /https:\/\/[a-z0-9]+(?:-[a-z0-9]+)+\.trycloudflare\.com/i, 30000);
-  return { url, kind: 'cloudflare (temporary)', proc: p };
+  if (cfd) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      process.stderr.write(`opening tunnel (try ${attempt}/3) …\n`);
+      const p = spawn(cfd, ['tunnel', '--no-autoupdate', '--url', `http://127.0.0.1:${PORT}`], { stdio: ['ignore', 'pipe', 'pipe'] });
+      const url = await waitForUrl(p, /https:\/\/[a-z0-9]+(?:-[a-z0-9]+)+\.trycloudflare\.com/i, 45000);
+      if (url) return { url, kind: 'cloudflare (temporary)', proc: p };
+      try { p.kill(); } catch {}
+    }
+  }
+  // 3) fallback: localhost.run over ssh — a different service, no binary, no
+  //    account. Saves us when Cloudflare's free tunnel is rate-limited or slow.
+  const ssh = findCmd('ssh');
+  if (ssh) {
+    process.stderr.write('cloudflare stalled — trying a second tunnel (localhost.run) …\n');
+    const p = spawn(ssh, ['-o', 'StrictHostKeyChecking=no', '-o', 'ServerAliveInterval=30', '-R', `80:localhost:${PORT}`, 'nokey@localhost.run'], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const url = await waitForUrl(p, /https:\/\/[a-z0-9-]+\.lhr\.life\S*/i, 45000);
+    if (url) return { url, kind: 'localhost.run (temporary)', proc: p };
+    try { p.kill(); } catch {}
+  }
+  return { url: null };
 }
 
 function waitForUrl(proc, re, ms) {
