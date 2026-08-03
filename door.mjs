@@ -194,7 +194,9 @@ async function openTunnel() {
     cfd = await download(`https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-${os}-${a}`, dest);
   }
   const p = spawn(cfd, ['tunnel', '--url', `http://127.0.0.1:${PORT}`], { stdio: ['ignore', 'pipe', 'pipe'] });
-  const url = await waitForUrl(p, /https:\/\/[a-z0-9-]+\.trycloudflare\.com/i, 30000);
+  // The real quick-tunnel host is multi-word + hyphenated (e.g. blue-cat-run-9.trycloudflare.com).
+  // Require at least one hyphen so we never grab cloudflared's own api.trycloudflare.com line.
+  const url = await waitForUrl(p, /https:\/\/[a-z0-9]+(?:-[a-z0-9]+)+\.trycloudflare\.com/i, 30000);
   return { url, kind: 'cloudflare (temporary)', proc: p };
 }
 
