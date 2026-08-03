@@ -28,7 +28,7 @@ import { randomBytes } from 'node:crypto';
 import { homedir, tmpdir, platform, arch } from 'node:os';
 import { get } from 'node:https';
 
-const PORT = parseInt(process.env.PORT || '8080', 10);
+let PORT = parseInt(process.env.PORT || '8080', 10);
 const ROOT = resolve(process.env.ROOT || homedir());
 const SHELL_ENABLED = process.env.SHELL === '1';
 const MEMORY_PATH = resolve(process.env.MEMORY || join(homedir(), '.claude-connector-memory.md'));
@@ -216,7 +216,22 @@ function waitForUrl(proc, re, ms) {
   });
 }
 
-server.listen(PORT, '127.0.0.1', async () => {
+// Start listening, and if an old door is still holding the port, quietly step
+// to the next one instead of dying with EADDRINUSE. So a stale copy can never
+// block a fresh run — the steward never has to hunt down a process.
+function start(port, triesLeft) {
+  server.removeAllListeners('error');
+  server.once('error', (e) => {
+    if (e.code === 'EADDRINUSE' && triesLeft > 0) {
+      console.error('  port ' + port + ' busy (an old door?), trying ' + (port + 1) + ' …');
+      start(port + 1, triesLeft - 1);
+    } else {
+      console.error('  cannot start: ' + e.message);
+      process.exit(1);
+    }
+  });
+  server.listen(port, '127.0.0.1', async () => {
+  PORT = port;
   const t = await openTunnel();
   const line = '═'.repeat(66);
   console.log('\n' + line);
@@ -253,4 +268,6 @@ server.listen(PORT, '127.0.0.1', async () => {
   }
   console.log('  Ctrl-C closes the door.');
   console.log(line + '\n');
-});
+  });
+}
+start(PORT, 12);

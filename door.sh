@@ -3,19 +3,18 @@
 #
 # It heals its own PATH, finds or installs node, writes the door, and opens it.
 # The door copies its link straight to your clipboard, so you never type or
-# select anything — you just paste into Chrome.
+# select anything — you just paste into Chrome. If an old door is still running,
+# the new one steps to the next free port automatically.
 #
 # Run it (one paste):
 #   curl -fsSL https://raw.githubusercontent.com/Zheke32174/understory-passgen/claude/finish-these-vwikhs/door.sh | sh
 
-# 1) make PATH + HOME sane no matter how broken the shell is
 PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
 export PREFIX
 export PATH="$PREFIX/bin:$PREFIX/bin/applets:/system/bin:/system/xbin:$PATH"
 export HOME="${HOME:-/data/data/com.termux/files/home}"
 cd "$HOME" 2>/dev/null || cd "$PREFIX/tmp" 2>/dev/null || cd /tmp 2>/dev/null || true
 
-# 2) find node; install it if missing
 NODE="$(command -v node 2>/dev/null || true)"
 [ -z "$NODE" ] && [ -x "$PREFIX/bin/node" ] && NODE="$PREFIX/bin/node"
 if [ -z "$NODE" ]; then
@@ -30,10 +29,8 @@ if [ -z "$NODE" ]; then
   exit 1
 fi
 
-# 3) (best effort) make clipboard copy available so the link auto-copies
 command -v termux-clipboard-set >/dev/null 2>&1 || pkg install -y termux-api >/dev/null 2>&1 || true
 
-# 4) write the door (embedded — nothing else to download for this part)
 cat > "$HOME/door.mjs" <<'DOOR_MJS_EOF'
 // door.mjs — THE ONE PIECE.
 //
@@ -65,7 +62,7 @@ import { randomBytes } from 'node:crypto';
 import { homedir, tmpdir, platform, arch } from 'node:os';
 import { get } from 'node:https';
 
-const PORT = parseInt(process.env.PORT || '8080', 10);
+let PORT = parseInt(process.env.PORT || '8080', 10);
 const ROOT = resolve(process.env.ROOT || homedir());
 const SHELL_ENABLED = process.env.SHELL === '1';
 const MEMORY_PATH = resolve(process.env.MEMORY || join(homedir(), '.claude-connector-memory.md'));
@@ -253,7 +250,22 @@ function waitForUrl(proc, re, ms) {
   });
 }
 
-server.listen(PORT, '127.0.0.1', async () => {
+// Start listening, and if an old door is still holding the port, quietly step
+// to the next one instead of dying with EADDRINUSE. So a stale copy can never
+// block a fresh run — the steward never has to hunt down a process.
+function start(port, triesLeft) {
+  server.removeAllListeners('error');
+  server.once('error', (e) => {
+    if (e.code === 'EADDRINUSE' && triesLeft > 0) {
+      console.error('  port ' + port + ' busy (an old door?), trying ' + (port + 1) + ' …');
+      start(port + 1, triesLeft - 1);
+    } else {
+      console.error('  cannot start: ' + e.message);
+      process.exit(1);
+    }
+  });
+  server.listen(port, '127.0.0.1', async () => {
+  PORT = port;
   const t = await openTunnel();
   const line = '═'.repeat(66);
   console.log('\n' + line);
@@ -290,9 +302,10 @@ server.listen(PORT, '127.0.0.1', async () => {
   }
   console.log('  Ctrl-C closes the door.');
   console.log(line + '\n');
-});
+  });
+}
+start(PORT, 12);
 DOOR_MJS_EOF
 
-# 5) open the door (shell access on, so Claude can act, not just look)
 export SHELL=1
 exec "$NODE" "$HOME/door.mjs"
