@@ -57,6 +57,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -465,32 +466,59 @@ private fun GenerateTab(
     var autoClearOn by remember { mutableStateOf(initial.clearOn) }
     var autoClearSecondsText by remember { mutableStateOf(initial.clearSeconds.toString()) }
     var keepGeneratedValue by remember { mutableStateOf(initial.keepGeneratedValue) }
+    var mode by remember { mutableStateOf(initial.mode) }
+    var minDigits by remember { mutableIntStateOf(initial.minDigits) }
+    var minSymbols by remember { mutableIntStateOf(initial.minSymbols) }
+    var avoidAmbiguous by remember { mutableStateOf(initial.avoidAmbiguous) }
+    var words by remember { mutableIntStateOf(initial.words) }
+    var separator by remember { mutableStateOf(initial.separator) }
+    var capitalize by remember { mutableStateOf(initial.capitalize) }
+    var includeNumber by remember { mutableStateOf(initial.includeNumber) }
 
     LaunchedEffect(Unit) {
         snapshotFlow { length }.collect { lengthText = it.toString() }
     }
 
+    // The full recipe as currently configured on screen. Single source for
+    // persistence, validity, the strength meter, and the Generate action — so
+    // what the meter scores is exactly what the button generates.
+    fun buildSnapshot() = Settings.Snapshot(
+        length = length,
+        lowers = lowers,
+        uppers = uppers,
+        digits = digits,
+        symbols = symbols,
+        clearOn = autoClearOn,
+        clearSeconds = autoClearSecondsText.toIntOrNull()?.takeIf { it > 0 } ?: 30,
+        keepGeneratedValue = keepGeneratedValue,
+        mode = mode,
+        minLowers = initial.minLowers,
+        minUppers = initial.minUppers,
+        minDigits = minDigits,
+        minSymbols = minSymbols,
+        avoidAmbiguous = avoidAmbiguous,
+        excludeChars = initial.excludeChars,
+        words = words,
+        separator = separator,
+        capitalize = capitalize,
+        includeNumber = includeNumber,
+    )
+
     // Persist any change. Settings hold no secrets, only generation shape and
     // the keep-value preference (a boolean, not a password).
-    DisposableEffect(length, lowers, uppers, digits, symbols, autoClearOn, autoClearSecondsText, keepGeneratedValue) {
-        Settings.save(
-            context,
-            Settings.Snapshot(
-                length = length,
-                lowers = lowers,
-                uppers = uppers,
-                digits = digits,
-                symbols = symbols,
-                clearOn = autoClearOn,
-                clearSeconds = autoClearSecondsText.toIntOrNull()?.takeIf { it > 0 } ?: 30,
-                keepGeneratedValue = keepGeneratedValue,
-            ),
-        )
+    DisposableEffect(
+        length, lowers, uppers, digits, symbols, autoClearOn, autoClearSecondsText,
+        keepGeneratedValue, mode, minDigits, minSymbols, avoidAmbiguous,
+        words, separator, capitalize, includeNumber,
+    ) {
+        Settings.save(context, buildSnapshot())
         onDispose {}
     }
 
     val anyEnabled = lowers || uppers || digits || symbols
-    val canGenerate = anyEnabled && length in 1..1000
+    val snapshotNow = buildSnapshot()
+    val canGenerate = Generate.isValid(snapshotNow)
+    val entropyBits = Generate.entropyBits(snapshotNow)
 
     val autofillManager = remember { context.getSystemService(AutofillManager::class.java) }
     var autofillEnabled by remember {
@@ -558,11 +586,29 @@ private fun GenerateTab(
             }
         }
 
+        // --- Mode selector: random characters vs EFF passphrase. Drives every
+        // delivery path (clipboard / keyboard / autofill / vault) via Settings. ---
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(UnderstoryTheme.spacing.sm),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            CharsetChip(
+                stringResource(R.string.label_mode_password),
+                mode == Settings.MODE_CHARS,
+                Modifier.weight(1f),
+            ) { mode = Settings.MODE_CHARS }
+            CharsetChip(
+                stringResource(R.string.label_mode_passphrase),
+                mode == Settings.MODE_WORDS,
+                Modifier.weight(1f),
+            ) { mode = Settings.MODE_WORDS }
+        }
+
         // --- Recipe group: length + character sets. The sanctioned SliderRow /
         // SwitchRow controls carry their own full-width padding, so this group is
         // a full-bleed Surface (GroupCard) rather than SuiteCard's padded Column;
         // text/field/chips inside get an explicit lg inset to align with them. ---
-        GroupCard {
+        if (mode == Settings.MODE_CHARS) GroupCard {
             GroupHeader(
                 icon = Icons.Outlined.Tune,
                 title = stringResource(R.string.card_recipe_title),
@@ -625,8 +671,77 @@ private fun GenerateTab(
                     modifier = Modifier.padding(horizontal = UnderstoryTheme.spacing.lg),
                 )
             }
+            // Composition-rule knobs: sites that demand "at least N digits /
+            // symbols" get a guaranteed-compliant password; ambiguous-character
+            // avoidance for values a human may transcribe by eye.
+            if (digits) {
+                SliderRow(
+                    label = stringResource(R.string.label_min_digits),
+                    value = minDigits.toFloat(),
+                    onValueChange = { minDigits = it.toInt().coerceIn(0, 9) },
+                    valueRange = 0f..9f,
+                    valueText = stringResource(R.string.fmt_at_least, minDigits),
+                )
+            }
+            if (symbols) {
+                SliderRow(
+                    label = stringResource(R.string.label_min_symbols),
+                    value = minSymbols.toFloat(),
+                    onValueChange = { minSymbols = it.toInt().coerceIn(0, 9) },
+                    valueRange = 0f..9f,
+                    valueText = stringResource(R.string.fmt_at_least, minSymbols),
+                )
+            }
+            SwitchRow(
+                label = stringResource(R.string.label_avoid_ambiguous),
+                checked = avoidAmbiguous,
+                onCheckedChange = { avoidAmbiguous = it },
+                supporting = stringResource(R.string.msg_avoid_ambiguous_sub),
+            )
             Spacer(Modifier.height(UnderstoryTheme.spacing.xs))
         }
+
+        // --- Passphrase recipe: EFF large wordlist shape. ---
+        if (mode == Settings.MODE_WORDS) GroupCard {
+            GroupHeader(
+                icon = Icons.Outlined.Tune,
+                title = stringResource(R.string.card_passphrase_title),
+                subtitle = stringResource(R.string.card_passphrase_desc),
+            )
+            SliderRow(
+                label = stringResource(R.string.label_word_count),
+                value = words.toFloat(),
+                onValueChange = { words = it.toInt().coerceIn(2, 20) },
+                valueRange = 2f..20f,
+                valueText = stringResource(R.string.fmt_words, words),
+            )
+            OutlinedTextField(
+                value = separator,
+                onValueChange = { raw ->
+                    separator = raw.filterNot { it.isISOControl() }.take(3)
+                },
+                label = { Text(stringResource(R.string.label_separator)) },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = UnderstoryTheme.spacing.lg),
+            )
+            SwitchRow(
+                label = stringResource(R.string.label_capitalize),
+                checked = capitalize,
+                onCheckedChange = { capitalize = it },
+            )
+            SwitchRow(
+                label = stringResource(R.string.label_include_number),
+                checked = includeNumber,
+                onCheckedChange = { includeNumber = it },
+                supporting = stringResource(R.string.msg_include_number_sub),
+            )
+            Spacer(Modifier.height(UnderstoryTheme.spacing.xs))
+        }
+
+        // --- Live strength meter for the configured recipe. ---
+        StrengthMeter(bits = entropyBits)
 
         // --- Options group: auto-clear + receipts keep-value. ---
         GroupCard {
@@ -674,15 +789,11 @@ private fun GenerateTab(
         }
         SecureButton(
             onClick = {
-                val opts = PasswordGenerator.Options(
-                    length = length,
-                    lowers = lowers,
-                    uppers = uppers,
-                    digits = digits,
-                    symbols = symbols,
-                )
-                val snap = Settings.load(context)
-                val chars = PasswordGenerator.generate(opts)
+                // Persist first so the on-screen recipe is exactly what every
+                // path (including this one) generates from.
+                val snap = buildSnapshot()
+                Settings.save(context, snap)
+                val chars = Generate.fromSnapshot(snap)
                 try {
                     val seconds = if (autoClearOn) {
                         autoClearSecondsText.toIntOrNull()?.takeIf { it > 0 } ?: 30
@@ -697,15 +808,16 @@ private fun GenerateTab(
                         )
                     }
                     // §5.2: honest auto-clear copy — the clear is a process-scoped
-                    // Handler, so promise it only while passgen runs.
+                    // Handler, so promise it only while passgen runs. chars.size,
+                    // not `length`: a passphrase's character count is derived.
                     val msg = if (seconds != null) {
-                        context.getString(R.string.fmt_copied_autoclear, length, seconds)
+                        context.getString(R.string.fmt_copied_autoclear, chars.size, seconds)
                     } else {
-                        context.getString(R.string.fmt_copied, length)
+                        context.getString(R.string.fmt_copied, chars.size)
                     }
                     Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                 } finally {
-                    PasswordGenerator.wipe(chars)
+                    Generate.wipe(chars)
                 }
             },
             enabled = canGenerate,
@@ -893,6 +1005,50 @@ private fun GenerateTab(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+}
+
+/**
+ * Live entropy readout for the configured recipe. Honest math only: the exact
+ * combinatorial strength of the shape (see [PasswordGenerator.entropyBits] /
+ * [PassphraseGenerator.entropyBits]) — never a zxcvbn-style guess flattering
+ * the output. Renders bits + a qualitative band + a capped progress bar.
+ */
+@Composable
+private fun StrengthMeter(bits: Double) {
+    val label: String
+    val color: androidx.compose.ui.graphics.Color
+    when {
+        bits < 45 -> { label = stringResource(R.string.strength_weak); color = MaterialTheme.colorScheme.error }
+        bits < 70 -> { label = stringResource(R.string.strength_fair); color = UnderstoryTheme.semantic.warning }
+        bits < 100 -> { label = stringResource(R.string.strength_strong); color = UnderstoryTheme.semantic.success }
+        else -> { label = stringResource(R.string.strength_excellent); color = MaterialTheme.colorScheme.primary }
+    }
+    SuiteCard {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.label_strength), style = MaterialTheme.typography.titleMedium)
+            Text(
+                "$label · " + stringResource(R.string.fmt_entropy_bits, bits.toInt().toString()),
+                style = MaterialTheme.typography.titleSmall,
+                color = color,
+            )
+        }
+        Spacer(Modifier.height(UnderstoryTheme.spacing.xs))
+        LinearProgressIndicator(
+            progress = { (bits / 128.0).toFloat().coerceIn(0f, 1f) },
+            color = color,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(UnderstoryTheme.spacing.xs))
+        Text(
+            stringResource(R.string.msg_entropy_explainer),
+            style = MaterialTheme.typography.bodySmall,
+            color = UnderstoryTheme.semantic.dim,
+        )
     }
 }
 

@@ -871,13 +871,12 @@ private fun AddEntryScreen(
                         // Store the user-provided existing password verbatim.
                         commit(manualPassword, wipe = null)
                     } else {
-                        val opts = Settings.toGeneratorOptions(snap)
-                        if (!opts.isValid()) {
+                        if (!Generate.isValid(snap)) {
                             error = "Generator settings invalid (length 1–1000, ≥1 character class)."
                             working = false
                             return@SecureButton
                         }
-                        val chars = PasswordGenerator.generate(opts)
+                        val chars = Generate.fromSnapshot(snap)
                         commit(String(chars), wipe = { PasswordGenerator.wipe(chars) })
                     }
                 },
@@ -1767,8 +1766,8 @@ private fun ViewEntryScreen(
 
     fun regeneratePassword() {
         if (working) return
-        val opts = Settings.toGeneratorOptions(Settings.load(ctx))
-        if (!opts.isValid()) {
+        val snap = Settings.load(ctx)
+        if (!Generate.isValid(snap)) {
             status = "Generator settings invalid (length 1–1000, ≥1 character class)."
             return
         }
@@ -1782,7 +1781,7 @@ private fun ViewEntryScreen(
                 title = "Regenerate password",
                 cipher = cipher,
                 onSuccess = {
-                    val chars = PasswordGenerator.generate(opts)
+                    val chars = Generate.fromSnapshot(snap)
                     try {
                         val now = System.currentTimeMillis()
                         val newPassword = String(chars)

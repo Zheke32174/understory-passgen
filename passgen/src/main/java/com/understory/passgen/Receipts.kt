@@ -59,6 +59,8 @@ object Receipts {
         val uppers: Boolean,
         val digits: Boolean,
         val symbols: Boolean,
+        val mode: String = Settings.MODE_CHARS, // "chars" | "words"
+        val words: Int = 0,                     // word count when mode == "words"
         val savedValue: String?,  // null unless the user armed "keep generated value"
         val claimed: Boolean,
     ) {
@@ -74,6 +76,8 @@ object Receipts {
                 put("uppers", uppers)
                 put("digits", digits)
                 put("symbols", symbols)
+                put("mode", mode)
+                put("words", words)
             })
             if (savedValue != null) put("savedValue", savedValue)
             put("claimed", claimed)
@@ -93,6 +97,8 @@ object Receipts {
                     uppers = shape.optBoolean("uppers", false),
                     digits = shape.optBoolean("digits", false),
                     symbols = shape.optBoolean("symbols", false),
+                    mode = shape.optString("mode", Settings.MODE_CHARS),
+                    words = shape.optInt("words", 0),
                     savedValue = if (o.has("savedValue")) o.optString("savedValue") else null,
                     claimed = o.optBoolean("claimed", false),
                 )
@@ -133,6 +139,8 @@ object Receipts {
             uppers = shape.uppers,
             digits = shape.digits,
             symbols = shape.symbols,
+            mode = shape.mode,
+            words = shape.words,
             savedValue = value?.let { String(it) },
             claimed = false,
         )

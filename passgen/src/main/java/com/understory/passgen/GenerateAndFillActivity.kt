@@ -71,8 +71,7 @@ class GenerateAndFillActivity : Activity() {
         }
 
         val snap = Settings.load(applicationContext)
-        val opts = Settings.toGeneratorOptions(snap)
-        if (!opts.isValid()) {
+        if (!Generate.isValid(snap)) {
             setResult(RESULT_CANCELED)
             finish()
             return
@@ -81,7 +80,7 @@ class GenerateAndFillActivity : Activity() {
         val target = intent.getStringExtra(EXTRA_TARGET) ?: ""
         val kind = intent.getStringExtra(EXTRA_TARGET_KIND) ?: "unknown"
 
-        val chars = PasswordGenerator.generate(opts)
+        val chars = Generate.fromSnapshot(snap)
         val value: AutofillValue = try {
             // §2.2: write a receipt BEFORE the wipe so the user is never silently
             // locked out. Synchronous on purpose: this invisible activity is
