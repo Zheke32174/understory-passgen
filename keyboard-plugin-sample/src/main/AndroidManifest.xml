@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      Reference Kotoba plugin. Deliberately has NO launcher activity and NO
+      permissions at all — it exists purely as a plugin service the Kotoba
+      keyboard binds after the user enables it in the plugin manager, and
+      as a working template for third-party plugin authors.
+    -->
+    <application
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:usesCleartextTraffic="false"
+        android:supportsRtl="true">
+
+        <service
+            android:name=".SamplePluginService"
+            android:exported="true"
+            android:label="@string/plugin_label">
+            <intent-filter>
+                <action android:name="com.understory.keyboard.plugin.SERVICE" />
+            </intent-filter>
+            <meta-data
+                android:name="com.understory.keyboard.plugin.API_VERSION"
+                android:value="1" />
+        </service>
+
+    </application>
+
+</manifest>

@@ -66,6 +66,25 @@ Only the generation **shape** — length, which character classes, auto-clear
 seconds. No password value is ever persisted. Stored in plain
 `SharedPreferences` (these are not secrets).
 
+## Kotoba Keyboard (co-resident app)
+
+This repo also hosts **Kotoba Keyboard** — a brand-new, from-scratch IME
+with a real **plugin system** (out-of-process plugin APKs over AIDL, user
+opt-in with trust-on-first-use signature pinning, never invoked on
+password fields). It lives here beside passgen because passgen is the
+suite's keyboard-adjacent repo (its own IME delivery mode shares the
+lessons); it can split into its own repo later, the same way the suite
+apps split from `underward`.
+
+- Modules: `keyboard/` (the IME), `keyboard-plugin-api/` (contract
+  library for plugin authors), `keyboard-plugin-sample/` (reference
+  plugin).
+- Docs: [`docs/keyboard.md`](docs/keyboard.md) and
+  [`docs/keyboard-plugin-api.md`](docs/keyboard-plugin-api.md).
+- Same hardening family as passgen: zero network permission, password
+  fields get a no-suggestions/no-plugins/`FLAG_SECURE` mode, learned
+  words never leave private storage.
+
 ## Provenance & suite
 
 Split 2026-07-02 from `Zheke32174/underward` `android/` (commit `f867493`) into per-app repos — one repo per suite app.
