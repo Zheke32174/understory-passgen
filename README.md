@@ -6,6 +6,47 @@ password manager (e.g. Bitwarden) — it does not require, and never seizes, the
 autofill slot. **The generated password value never appears on screen anywhere**
 — not in a label, not in a toast, not in a text field, not in logcat.
 
+## Generator
+
+Two modes, both driving every delivery path (clipboard / keyboard / autofill /
+ledger) from the same persisted recipe:
+
+- **Characters** — length 1–1000 over four character classes (27-symbol set),
+  with per-class minimum counts ("at least 3 digits, 2 symbols" is guaranteed
+  in every output, not just on average), ambiguous-character avoidance
+  (`I l 1 O 0`), and an arbitrary exclusion list for sites that reject
+  specific characters. Required characters are Fisher–Yates-shuffled through
+  the whole value — never clustered at the front.
+- **Passphrase** — 2–20 words from the embedded EFF large wordlist (7776
+  words, ≈12.9 bits/word; no network fetch, ever), custom separator (up to 3
+  chars, empty allowed), per-word capitalization, and an optional digit
+  appended to a random word for "must contain a number" policies.
+
+A live **strength meter** shows the exact combinatorial entropy of the
+configured recipe — honest math on the shape (no zxcvbn-style guessing, no
+flattery; deterministic options like capitalization add zero bits).
+
+### vs. Bitwarden's generator
+
+| Capability | Bitwarden | Understory Keys |
+| --- | --- | --- |
+| Password length | 5–128 | 1–1000 |
+| Symbol set | 8 fixed (`!@#$%^&*`) | 27 |
+| Minimum counts | digits + symbols | digits + symbols (UI); all four classes (engine) |
+| Avoid ambiguous chars | ✓ | ✓ (same set) |
+| Exclude arbitrary chars | ✗ | ✓ (engine, up to 64) |
+| EFF passphrase mode | 3–20 words | 2–20 words (2–40 engine) |
+| Word separator | 1 char | 0–3 chars |
+| Capitalize / include number | ✓ | ✓ |
+| Entropy meter | ✗ | ✓ exact bits, live |
+| Value rendered on screen | by default | never |
+| Delivery paths | autofill, copy | autofill, IME typing (no clipboard, no autofill IPC), copy |
+| Generated-password receipts | ✗ | ✓ device-encrypted ledger |
+| Network permission | required (sync) | none, stripped at manifest |
+
+Bitwarden's username/email-alias generators are deliberately out of scope:
+they require network calls, and this app ships with zero network permission.
+
 Three delivery modes:
 
 1. **Keyboard (the coexistence path)** — enable the passgen keyboard and switch
@@ -62,9 +103,10 @@ adb install -r passgen/build/outputs/apk/debug/passgen-debug.apk
 
 ## What's persisted
 
-Only the generation **shape** — length, which character classes, auto-clear
-seconds. No password value is ever persisted. Stored in plain
-`SharedPreferences` (these are not secrets).
+Only the generation **shape** — mode (characters/passphrase), length, which
+character classes, per-class minimums, ambiguity/exclusion filters, word
+count, separator, and auto-clear seconds. No password value is ever
+persisted. Stored in plain `SharedPreferences` (these are not secrets).
 
 ## Provenance & suite
 

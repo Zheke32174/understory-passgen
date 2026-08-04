@@ -201,10 +201,9 @@ class PassgenInputMethodService : InputMethodService() {
             val ic = currentInputConnection
             if (ic == null) { setStatus("couldn't type: no input field focused"); return@runCatching }
             val snap = Settings.load(applicationContext)
-            val opts = Settings.toGeneratorOptions(snap)
-            if (!opts.isValid()) { setStatus("couldn't type: invalid generator settings"); return@runCatching }
+            if (!Generate.isValid(snap)) { setStatus("couldn't type: invalid generator settings"); return@runCatching }
 
-            val chars = PasswordGenerator.generate(opts)
+            val chars = Generate.fromSnapshot(snap)
             try {
                 ic.commitText(String(chars), 1)
                 // §2.2: write a receipt (best-effort). A receipt failure must not

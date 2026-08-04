@@ -14,6 +14,8 @@
     <string name="msg_a11y_active">⚠  %1$d third-party accessibility service(s) active. Accessibility services can read text on screen and inject taps. Tap to review.</string>
     <string name="action_review_a11y">Review accessibility services</string>
 
+    <string name="label_mode_password">Characters</string>
+    <string name="label_mode_passphrase">Passphrase</string>
     <string name="label_length">Length</string>
     <string name="fmt_chars">%1$d characters</string>
     <string name="label_exact_length">Exact length (1–1000)</string>
@@ -21,6 +23,26 @@
     <string name="label_uppercase">Uppercase  A–Z</string>
     <string name="label_digits">Digits  0–9</string>
     <string name="label_symbols">Symbols  !@#…</string>
+    <string name="label_min_digits">Minimum digits</string>
+    <string name="label_min_symbols">Minimum symbols</string>
+    <string name="fmt_at_least">at least %1$d</string>
+    <string name="label_avoid_ambiguous">Avoid ambiguous characters</string>
+    <string name="msg_avoid_ambiguous_sub">Drops I, l, 1, O, 0 — for passwords you may have to read or type by eye.</string>
+    <string name="label_word_count">Words</string>
+    <string name="fmt_words">%1$d words</string>
+    <string name="label_separator">Word separator (up to 3 characters)</string>
+    <string name="label_capitalize">Capitalize each word</string>
+    <string name="label_include_number">Include a digit</string>
+    <string name="msg_include_number_sub">Appends one random digit to a random word — satisfies “must contain a number” rules.</string>
+    <string name="card_passphrase_title">Passphrase recipe</string>
+    <string name="card_passphrase_desc">Random words from the EFF large wordlist (7,776 words) — easy to remember and type, hard to guess.</string>
+    <string name="label_strength">Strength</string>
+    <string name="fmt_entropy_bits">%1$s bits</string>
+    <string name="strength_weak">Weak</string>
+    <string name="strength_fair">Fair</string>
+    <string name="strength_strong">Strong</string>
+    <string name="strength_excellent">Excellent</string>
+    <string name="msg_entropy_explainer">Entropy of the recipe, computed locally. 90+ bits withstands offline cracking for the foreseeable future.</string>
     <string name="label_auto_clear">Auto-clear clipboard</string>
     <string name="label_seconds_before_clear">Seconds before clear</string>
     <string name="label_keep_value">Save generated passwords to receipts (so you can recover them)</string>
