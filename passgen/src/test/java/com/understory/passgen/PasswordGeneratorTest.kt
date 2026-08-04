@@ -149,8 +149,9 @@ class PasswordGeneratorTest {
         val opts = PasswordGenerator.Options(16, true, true, true, true)
         val out = PasswordGenerator.generate(opts)
         PasswordGenerator.wipe(out)
+        // wipe() zeroes the buffer (NUL), it does not blank it with spaces.
         for (c in out) {
-            assertEquals(' ', c)
+            assertEquals('\u0000', c)
         }
     }
 
