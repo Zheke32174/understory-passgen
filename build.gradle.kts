@@ -157,3 +157,13 @@ subprojects {
         }
     }
 }
+
+// Release reproducibility: lock every project configuration. The committed
+// lock state is generated with Gradle 8.10.2 and reviewed like source. An
+// intentionally changed dependency therefore requires an explicit lock update
+// instead of silently changing the transitive graph on a later build.
+allprojects {
+    dependencyLocking {
+        lockAllConfigurations()
+    }
+}
